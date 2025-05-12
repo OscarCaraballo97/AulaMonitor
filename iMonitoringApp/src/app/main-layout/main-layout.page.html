@@ -1,0 +1,75 @@
+<ion-app [ngClass]="{'dark': themeService.isDarkMode()}">
+  <ion-menu contentId="kwd-main-content" menuId="kwd-sidebar" side="start"
+            class="hidden md:flex md:flex-shrink-0 md:w-64 bg-white border-r dark:border-kwd-blue-800 dark:bg-kwd-darker">
+    <ion-footer class="px-2 py-4 border-t dark:border-kwd-blue-800">
+      <ion-toolbar class="dark:bg-kwd-darker">
+        <button (click)="openPanel('settings')" class="flex items-center justify-center w-full px-4 py-2 text-sm text-white rounded-md bg-kwd-blue-DEFAULT hover:bg-kwd-blue-700 focus:outline-none">
+          <ion-icon name="settings-outline" class="w-4 h-4 mr-2"></ion-icon>
+          <span>Personalizar</span>
+        </button>
+      </ion-toolbar>
+    </ion-footer>
+  </ion-menu>
+
+  <div class="ion-page flex flex-col flex-1 min-h-screen overflow-x-hidden overflow-y-auto" id="kwd-main-content">
+    <ion-header class="relative bg-white dark:bg-kwd-darker">
+      <ion-toolbar class="flex items-center justify-between p-2 border-b dark:border-kwd-blue-800">
+        <ion-buttons slot="end" class="hidden space-x-2 md:flex md:items-center">
+          <button (click)="openPanel('notifications')" class="p-2 text-blue-400 transition-colors duration-200 rounded-full bg-blue-50 hover:text-kwd-blue-600 dark:text-kwd-light dark:hover:bg-kwd-blue-700 dark:bg-kwd-dark focus:outline-none">
+            <ion-icon name="notifications-outline" class="w-7 h-7"></ion-icon>
+          </button>
+          
+          <button (click)="openPanel('search')" class="p-2 text-blue-400 transition-colors duration-200 rounded-full bg-blue-50 hover:text-kwd-blue-600 dark:text-kwd-light dark:hover:bg-kwd-blue-700 dark:bg-kwd-dark focus:outline-none">
+            <ion-icon name="search-outline" class="w-7 h-7"></ion-icon>
+          </button>
+          
+          <div class="relative">
+            <button (click)="isUserDropdownOpen = !isUserDropdownOpen" class="transition-opacity duration-200 rounded-full focus:outline-none">
+              <img class="w-10 h-10 rounded-full" [src]="currentUser?.avatarUrl || 'assets/icon/avatar_placeholder.png'" [alt]="currentUser?.name">
+            </button>
+            <div *ngIf="isUserDropdownOpen" (click)="isUserDropdownOpen = false" class="fixed inset-0 z-30 w-full h-full"></div>
+            <div *ngIf="isUserDropdownOpen"
+                 class="absolute right-0 w-48 py-1 mt-2 origin-top-right bg-white rounded-md shadow-lg top-full ring-1 ring-black ring-opacity-5 dark:bg-kwd-dark z-40">
+              <a routerLink="/app/profile" (click)="isUserDropdownOpen = false" class="block px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-kwd-light dark:hover:bg-kwd-blue-600">Tu Perfil</a>
+              <a (click)="openPanel('settings'); isUserDropdownOpen = false" class="block px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-kwd-light dark:hover:bg-kwd-blue-600 cursor-pointer">Configuración</a>
+              <a (click)="authService.logout(); isUserDropdownOpen = false" class="block px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-kwd-light dark:hover:bg-kwd-blue-600 cursor-pointer">Cerrar Sesión</a>
+            </div>
+          </div>
+        </ion-buttons>
+
+        </ion-toolbar>
+    </ion-header>
+
+    <ion-content class="flex-1 h-full p-4 bg-gray-100 dark:bg-kwd-dark">
+      <div *ngIf="showPageLoading"
+        class="fixed inset-0 z-50 flex items-center justify-center text-2xl font-semibold text-white bg-opacity-90 bg-kwd-blue-800">
+        Cargando...
+      </div>
+      <ion-router-outlet></ion-router-outlet>
+    </ion-content>
+  </div>
+
+  <ion-modal [isOpen]="isSettingsPanelOpen" (didDismiss)="closePanel('settings')"
+    cssClass="kwd-side-panel kwd-settings-panel" side="end" mode="ios" [backdropDismiss]="true">
+    <ng-template>
+      <app-settings-panel (closePanelRequest)="closePanel('settings')"></app-settings-panel>
+    </ng-template>
+  </ion-modal>
+
+  <ion-modal [isOpen]="isNotificationsPanelOpen" (didDismiss)="closePanel('notifications')"
+    cssClass="kwd-side-panel kwd-notifications-panel" side="end" mode="ios" [backdropDismiss]="true">
+    <ng-template>
+      <ion-header><ion-toolbar><ion-title>Notificaciones</ion-title><ion-buttons slot="end"><ion-button (click)="closePanel('notifications')">Cerrar</ion-button></ion-buttons></ion-toolbar></ion-header>
+      <ion-content class="ion-padding"><p>Contenido del panel de notificaciones.</p></ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <ion-modal [isOpen]="isSearchPanelOpen" (didDismiss)="closePanel('search')"
+    cssClass="kwd-side-panel kwd-search-panel" side="end" mode="ios" [backdropDismiss]="true">
+    <ng-template>
+      <ion-header><ion-toolbar><ion-title>Búsqueda</ion-title><ion-buttons slot="end"><ion-button (click)="closePanel('search')">Cerrar</ion-button></ion-buttons></ion-toolbar></ion-header>
+      <ion-content class="ion-padding"><p>Contenido del panel de búsqueda.</p></ion-content>
+    </ng-template>
+  </ion-modal>
+
+</ion-app>

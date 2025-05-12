@@ -1,2 +1,61 @@
-// For information on how to create your own theme, please see:
-// http://ionicframework.com/docs/theming/
+// src/theme/variables.scss
+@import './tailwind.scss'; // Ya debería estar aquí
+
+// Variables CSS personalizadas (prefijo kwd- para evitar colisiones)
+:root {
+  --kwd-light: #edf2f9;
+  --kwd-dark: #152e4d;
+  --kwd-darker: #12263f;
+
+  --kwd-color-red: #dc2626;
+  --kwd-color-green: #16a34a;
+  --kwd-color-blue: #2563eb; // Coincide con kwd-blue-DEFAULT en Tailwind config
+  --kwd-color-cyan: #0891b2;
+  --kwd-color-teal: #0d9488;
+  --kwd-color-fuchsia: #c026d3;
+  --kwd-color-orange: #ea580c;
+  --kwd-color-yellow: #ca8a04;
+  --kwd-color-violet: #7c3aed;
+
+  /* Variables de Color de Ionic */
+  --ion-color-primary: var(--kwd-color-blue);
+  --ion-color-primary-rgb: 37,99,235;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255,255,255;
+  --ion-color-primary-shade: #2056ce; // Un poco más oscuro
+  --ion-color-primary-tint: #3a72ec;  // Un poco más claro
+
+  --ion-color-secondary: var(--kwd-color-teal); // Ejemplo
+  --ion-color-secondary-rgb: 13,148,136;
+  --ion-color-secondary-contrast: #ffffff;
+  // ... Define el resto para secondary, tertiary, success, warning, danger
+
+  --ion-color-light: var(--kwd-light);
+  --ion-color-dark: var(--kwd-dark); // Para componentes Ionic, no el fondo del body
+  --ion-color-dark-rgb: 21,46,77;
+
+  /* Colores base para modo claro */
+  --ion-text-color: var(--kwd-dark);
+  --ion-background-color: var(--kwd-light); // Fondo principal de ion-content
+  --ion-toolbar-background: #ffffff; // Fondo de toolbars en claro
+  --ion-item-background: #ffffff;
+  --ion-card-background: #ffffff;
+  --ion-border-color: #e5e7eb; // Gris claro para bordes
+}
+
+/* Modo Oscuro para Componentes Ionic */
+/* La clase .dark en <html> o <body> es controlada por Tailwind y/o ThemeService */
+body.dark, :host(.dark) {
+  --ion-color-primary: #3B82F6; // kwd-blue-500
+  --ion-color-primary-rgb: 59,130,246;
+  --ion-color-primary-shade: #3573d8;
+  --ion-color-primary-tint: #4f8ff7;
+
+  --ion-text-color: var(--kwd-light);
+  --ion-background-color: var(--kwd-dark);
+  --ion-toolbar-background: var(--kwd-darker);
+  --ion-item-background: var(--kwd-darker);
+  --ion-tab-bar-background: var(--kwd-darker);
+  --ion-card-background: var(--kwd-darker);
+  --ion-border-color: #1e40af; // kwd-blue-800
+}

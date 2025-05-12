@@ -1,0 +1,90 @@
+<ion-header class="md:hidden">
+  <ion-toolbar color="primary" class="dark:bg-kwd-darker">
+    <ion-buttons slot="start">
+      <ion-menu-button menu="kwd-sidebar"></ion-menu-button>
+    </ion-buttons>
+    <ion-title class="dark:text-kwd-light">Dashboard</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding bg-gray-100 dark:bg-kwd-dark">
+  <div *ngIf="isLoadingRole" class="flex flex-col items-center justify-center h-full">
+    <ion-spinner name="crescent" color="primary"></ion-spinner>
+    <p class="mt-2 text-gray-600 dark:text-gray-400">Cargando información del dashboard...</p>
+    <p class="mt-1 text-xs text-gray-500 dark:text-gray-500">(Debug - Rol actual en TS: {{ userRole | json }})</p>
+  </div>
+
+  <div *ngIf="!isLoadingRole && userRole">
+    <div *ngIf="userRole === RolEnum.ADMIN"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Administrador</h1>
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div class="p-4 bg-white rounded-lg shadow-md dark:bg-kwd-darker">
+          <div class="flex items-center">
+            <div class="p-3 mr-4 text-blue-500 bg-blue-100 rounded-full dark:text-kwd-blue-300 dark:bg-kwd-blue-800">
+              <ion-icon name="business-outline" class="w-6 h-6"></ion-icon>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Edificios Totales</p>
+              <p class="text-2xl font-semibold text-gray-700 dark:text-kwd-light">{{ totalBuildings }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-4 bg-white rounded-lg shadow-md dark:bg-kwd-darker">
+          <div class="flex items-center">
+            <div class="p-3 mr-4 text-green-500 bg-green-100 rounded-full dark:text-kwd-green dark:bg-opacity-30">
+              <ion-icon name="calendar-number-outline" class="w-6 h-6"></ion-icon>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Reservas Activas</p>
+              <p class="text-2xl font-semibold text-gray-700 dark:text-kwd-light">{{ activeReservations }}</p>
+            </div>
+          </div>
+        </div>
+        </div>
+      <div class="mt-8 space-y-3">
+        <ion-button expand="block" routerLink="/app/buildings" color="primary" class="dark:text-white">Gestionar Edificios</ion-button>
+        <ion-button expand="block" routerLink="/app/classrooms" color="secondary" class="dark:text-white">Gestionar Aulas</ion-button>
+        <ion-button expand="block" routerLink="/app/reservations" color="tertiary" class="dark:text-white">Gestionar Reservas</ion-button>
+        <ion-button expand="block" routerLink="/app/users" color="warning" class="dark:text-kwd-dark">Gestionar Usuarios</ion-button>
+      </div>
+    </div>
+
+    <div *ngIf="userRole === RolEnum.PROFESOR"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Profesor</h1>
+      <p class="mt-2 text-gray-600 dark:text-gray-400">Bienvenido. Aquí puedes gestionar tus reservas y aulas.</p>
+      <div class="mt-6 space-y-3">
+        <ion-button expand="block" routerLink="/app/reservations/new" color="primary" class="dark:text-white">Crear Nueva Reserva</ion-button>
+        <ion-button expand="block" routerLink="/app/reservations" color="secondary" class="dark:text-white">Mis Reservas</ion-button>
+        <ion-button expand="block" routerLink="/app/classrooms" color="tertiary" class="dark:text-white">Ver Aulas</ion-button>
+      </div>
+    </div>
+
+    <div *ngIf="userRole === RolEnum.TUTOR"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Tutor</h1>
+      <p class="mt-2 text-gray-600 dark:text-gray-400">Gestiona tus sesiones de tutoría.</p>
+      <div class="mt-6 space-y-3">
+        <ion-button expand="block" routerLink="/app/reservations/new" color="primary" class="dark:text-white">Programar Tutoría</ion-button>
+        <ion-button expand="block" routerLink="/app/reservations" color="secondary" class="dark:text-white">Mis Sesiones</ion-button>
+      </div>
+    </div>
+
+    <div *ngIf="userRole === RolEnum.ESTUDIANTE"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Bienvenido, Estudiante</h1>
+      <p class="mt-2 text-gray-600 dark:text-gray-400">Consulta tus reservas y la disponibilidad de aulas.</p>
+      <div class="mt-6 space-y-3">
+        <ion-button expand="block" routerLink="/app/reservations" color="primary" class="dark:text-white">Mis Reservas</ion-button>
+        <ion-button expand="block" routerLink="/app/classrooms" color="secondary" class="dark:text-white">Ver Disponibilidad de Aulas</ion-button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoadingRole && !userRole" class="flex flex-col items-center justify-center h-full text-center">
+    <ion-icon name="alert-circle-outline" color="warning" class="text-4xl"></ion-icon>
+    <h2 class="mt-2 text-lg text-gray-700 dark:text-gray-300">No se pudo determinar el rol del usuario o no hay dashboard configurado.</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400">(Debug - Rol actual en TS: {{ userRole | json }})</p>
+  </div>
+
+  <div class="mt-10 text-center">
+    <p class="text-sm text-gray-600 dark:text-gray-400">Basado en el diseño KWD Dashboard.</p>
+    <div class="mt-2 space-x-4">
+      <a href="https://kamona-wd.github.io/kwd-dashboard/" target="_blank" class="text-sm text-kwd-blue-DEFAULT hover:underline dark:text-kwd-blue-400">Ver KWD Live</a>
+      <a href="https://github.com/Kamona-WD/kwd-dashboard" target="_blank" class="text-sm text-kwd-blue-DEFAULT hover:underline dark:text-kwd-blue-400">KWD Github Repo</a>
+    </div>
+  </div>
+</ion-content>
