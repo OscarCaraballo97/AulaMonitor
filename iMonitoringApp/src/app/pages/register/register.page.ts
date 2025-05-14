@@ -5,47 +5,34 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractContro
 import { Router, RouterModule } from '@angular/router';
 import {
   IonicModule,
-  AlertController,
-  LoadingController,
-  NavController,
-  ToastController 
-} from '@ionic/angular'; 
-
-
-import {
-    IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonContent,
-    IonList, IonItem, IonLabel, IonInput, IonSelect, IonSelectOption, IonButton, IonIcon,
-    IonSpinner 
-} from '@ionic/angular/standalone';
+  AlertController, LoadingController, NavController, ToastController
+} from '@ionic/angular';
 
 import { AuthService } from '../../services/auth.service';
-import { Rol } from '../../models/rol.model';        
-import { RegisterRequest } from '../../models/auth.model'; 
+import { Rol } from '../../models/rol.model';
+import { RegisterRequest } from '../../models/auth.model';
 
 
 export function passwordMatchValidator(): ValidatorFn {
   return (control: AbstractControl): { [key: string]: any } | null => {
     const password = control.get('password');
     const confirmPassword = control.get('confirmPassword');
-
     if (password && confirmPassword && password.value !== confirmPassword.value) {
       confirmPassword.setErrors({ passwordMismatch: true });
-   
-    } else if (confirmPassword?.hasError('passwordMismatch') && password?.value === confirmPassword?.value) {
-      
+      return { passwordMismatchGlobal: true };
+    }
+    if (confirmPassword?.hasError('passwordMismatch') && password?.value === confirmPassword?.value) {
       const errors = confirmPassword.errors;
       if (errors) {
         delete errors['passwordMismatch'];
-        if (Object.keys(errors).length === 0) {
-          confirmPassword.setErrors(null);
-        } else {
-          confirmPassword.setErrors(errors);
-        }
+        if (Object.keys(errors).length === 0) confirmPassword.setErrors(null);
+        else confirmPassword.setErrors(errors);
       }
     }
-    return null; 
+    return null;
   };
 }
+
 
 @Component({
   selector: 'app-register',
@@ -53,18 +40,15 @@ export function passwordMatchValidator(): ValidatorFn {
   styleUrls: ['./register.page.scss'],
   standalone: true,
   imports: [
-
+    IonicModule, 
     CommonModule,
     ReactiveFormsModule,
-    RouterModule,
-
-    IonicModule, 
-
+    RouterModule
   ]
 })
 export class RegisterPage implements OnInit {
   registerForm!: FormGroup;
-  public rolesForSelect: { key: string, value: Rol }[] = [];
+
   errorMessage: string = '';
   isLoading: boolean = false;
 
@@ -75,28 +59,23 @@ export class RegisterPage implements OnInit {
     private alertCtrl: AlertController,
     private loadingCtrl: LoadingController,
     private navCtrl: NavController,
-    private toastCtrl: ToastController 
+    private toastCtrl: ToastController
   ) {}
 
   ngOnInit() {
-
-    this.rolesForSelect = Object.keys(Rol)
-      .filter(key => isNaN(Number(key))) 
-      .map(key => ({ key: key, value: Rol[key as keyof typeof Rol] }));
-
     this.registerForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required],
-      role: [null, [Validators.required]]
+      
+      role: [Rol.ESTUDIANTE, [Validators.required]] 
     }, { validators: passwordMatchValidator() });
   }
-
 
   get email() { return this.registerForm.get('email'); }
   get password() { return this.registerForm.get('password'); }
   get confirmPassword() { return this.registerForm.get('confirmPassword'); }
-  get role() { return this.registerForm.get('role'); }
+
 
   async onSubmit() {
     if (this.registerForm.invalid) {
@@ -106,16 +85,19 @@ export class RegisterPage implements OnInit {
     }
 
     this.errorMessage = '';
-    this.isLoading = true; 
+    this.isLoading = true;
     const loading = await this.loadingCtrl.create({ message: 'Registrando...' });
     await loading.present();
 
     const formValues = this.registerForm.value;
-    const registrationData: RegisterRequest = { 
+   
+    const registrationData: RegisterRequest = {
       email: formValues.email,
       password: formValues.password,
-      role: formValues.role
+      role: Rol.ESTUDIANTE 
     };
+
+    console.log('Enviando datos de registro (solo Estudiante):', registrationData);
 
     this.authService.register(registrationData).subscribe({
       next: async (response) => {
@@ -142,20 +124,14 @@ export class RegisterPage implements OnInit {
   }
 
   async presentToast(message: string, color: 'success' | 'danger' | 'warning', iconName?: string) {
-    const toast = await this.toastCtrl.create({
-      message: message,
-      duration: 3000,
-      color: color,
-      position: 'top',
-      icon: iconName
-    });
+    const toast = await this.toastCtrl.create({ message, duration: 3000, color, position: 'top', icon: iconName });
     await toast.present();
   }
 
   async presentSuccessAlert() {
     const alert = await this.alertCtrl.create({
       header: 'Registro Exitoso',
-      message: 'Tu cuenta ha sido creada. Ahora serás redirigido para iniciar sesión.',
+      message: 'Tu cuenta de estudiante ha sido creada. Ahora serás redirigido para iniciar sesión.',
       buttons: [{
         text: 'OK',
         handler: () => {

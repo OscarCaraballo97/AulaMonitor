@@ -1,7 +1,6 @@
 
 import { Routes } from '@angular/router';
-
-export const BUILDING_ROUTES: Routes = [
+export const BUILDING_ROUTES: Routes = [ 
   {
     path: '',
     loadComponent: () => import('./building-list/building-list.page').then(m => m.BuildingListPage),

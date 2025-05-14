@@ -15,7 +15,8 @@
   </div>
 
   <div *ngIf="!isLoadingRole && userRole">
-    <div *ngIf="userRole === RolEnum.ADMIN"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Administrador</h1>
+    <div *ngIf="userRole === RolEnum.ADMIN">
+      <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Administrador</h1>
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <div class="p-4 bg-white rounded-lg shadow-md dark:bg-kwd-darker">
           <div class="flex items-center">
@@ -39,7 +40,7 @@
             </div>
           </div>
         </div>
-        </div>
+      </div>
       <div class="mt-8 space-y-3">
         <ion-button expand="block" routerLink="/app/buildings" color="primary" class="dark:text-white">Gestionar Edificios</ion-button>
         <ion-button expand="block" routerLink="/app/classrooms" color="secondary" class="dark:text-white">Gestionar Aulas</ion-button>
@@ -48,7 +49,8 @@
       </div>
     </div>
 
-    <div *ngIf="userRole === RolEnum.PROFESOR"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Profesor</h1>
+    <div *ngIf="userRole === RolEnum.PROFESOR">
+      <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Profesor</h1>
       <p class="mt-2 text-gray-600 dark:text-gray-400">Bienvenido. Aquí puedes gestionar tus reservas y aulas.</p>
       <div class="mt-6 space-y-3">
         <ion-button expand="block" routerLink="/app/reservations/new" color="primary" class="dark:text-white">Crear Nueva Reserva</ion-button>
@@ -57,7 +59,8 @@
       </div>
     </div>
 
-    <div *ngIf="userRole === RolEnum.TUTOR"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Tutor</h1>
+    <div *ngIf="userRole === RolEnum.TUTOR">
+      <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Dashboard del Tutor</h1>
       <p class="mt-2 text-gray-600 dark:text-gray-400">Gestiona tus sesiones de tutoría.</p>
       <div class="mt-6 space-y-3">
         <ion-button expand="block" routerLink="/app/reservations/new" color="primary" class="dark:text-white">Programar Tutoría</ion-button>
@@ -65,7 +68,8 @@
       </div>
     </div>
 
-    <div *ngIf="userRole === RolEnum.ESTUDIANTE"> <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Bienvenido, Estudiante</h1>
+    <div *ngIf="userRole === RolEnum.ESTUDIANTE">
+      <h1 class="mb-6 text-2xl font-semibold text-gray-800 dark:text-kwd-light">Bienvenido, Estudiante</h1>
       <p class="mt-2 text-gray-600 dark:text-gray-400">Consulta tus reservas y la disponibilidad de aulas.</p>
       <div class="mt-6 space-y-3">
         <ion-button expand="block" routerLink="/app/reservations" color="primary" class="dark:text-white">Mis Reservas</ion-button>
@@ -80,11 +84,4 @@
     <p class="text-sm text-gray-500 dark:text-gray-400">(Debug - Rol actual en TS: {{ userRole | json }})</p>
   </div>
 
-  <div class="mt-10 text-center">
-    <p class="text-sm text-gray-600 dark:text-gray-400">Basado en el diseño KWD Dashboard.</p>
-    <div class="mt-2 space-x-4">
-      <a href="https://kamona-wd.github.io/kwd-dashboard/" target="_blank" class="text-sm text-kwd-blue-DEFAULT hover:underline dark:text-kwd-blue-400">Ver KWD Live</a>
-      <a href="https://github.com/Kamona-WD/kwd-dashboard" target="_blank" class="text-sm text-kwd-blue-DEFAULT hover:underline dark:text-kwd-blue-400">KWD Github Repo</a>
-    </div>
-  </div>
 </ion-content>

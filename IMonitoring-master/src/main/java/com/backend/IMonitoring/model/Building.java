@@ -23,5 +23,6 @@ public class Building {
     private String location;
 
     @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<Classroom> classrooms = new ArrayList<>();
 }
