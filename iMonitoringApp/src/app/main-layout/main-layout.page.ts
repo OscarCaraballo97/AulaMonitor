@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { Router, RouterModule, NavigationEnd } from '@angular/router';
+import { Router, RouterModule, NavigationEnd, IsActiveMatchOptions } from '@angular/router';
 import { IonicModule, MenuController, Platform, PopoverController, NavController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../services/auth.service';
@@ -8,9 +8,8 @@ import { Rol } from '../models/rol.model';
 import { User } from '../models/user.model';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
-import { SettingsPanelComponent } from '../components/settings-panel/settings-panel.component'; 
+import { SettingsPanelComponent } from '../components/settings-panel/settings-panel.component';
 import { MobileActionsPopoverComponent } from '../components/mobile-actions-popover/mobile-actions-popover.component';
-
 
 interface NavLink {
   title: string;
@@ -49,9 +48,9 @@ export class MainLayoutPage implements OnInit, OnDestroy {
 
   navLinks: NavLink[] = [
     { title: 'Dashboard', icon: 'home-outline', route: '/app/dashboard', roles: [Rol.ADMIN, Rol.PROFESOR, Rol.TUTOR, Rol.ESTUDIANTE] },
-    { title: 'Edificios', icon: 'business-outline', route: '/app/buildings', roles: [Rol.ADMIN, Rol.PROFESOR] },
-    { title: 'Aulas', icon: 'cube-outline', route: '/app/classrooms', roles: [Rol.ADMIN, Rol.PROFESOR] },
-    { title: 'Reservas', icon: 'calendar-outline', route: '/app/reservations', roles: [Rol.ADMIN, Rol.PROFESOR, Rol.TUTOR] },
+    { title: 'Edificios', icon: 'business-outline', route: '/app/buildings', roles: [Rol.ADMIN] },
+    { title: 'Aulas', icon: 'cube-outline', route: '/app/classrooms', roles: [Rol.ADMIN, Rol.PROFESOR, Rol.TUTOR, Rol.ESTUDIANTE] },
+    { title: 'Reservas', icon: 'calendar-outline', route: '/app/reservations', roles: [Rol.ADMIN, Rol.PROFESOR, Rol.TUTOR, Rol.ESTUDIANTE] },
     { title: 'Usuarios', icon: 'people-outline', route: '/app/users', roles: [Rol.ADMIN] },
   ];
   filteredNavLinks: NavLink[] = [];
@@ -87,7 +86,6 @@ export class MainLayoutPage implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe(() => {
       this.updateLinkActiveStates();
-      this.cdr.detectChanges();
     });
   }
 
@@ -98,40 +96,75 @@ export class MainLayoutPage implements OnInit, OnDestroy {
 
   updateFilteredNavLinks() {
     if (!this.userRole) {
-      this.filteredNavLinks = []; return;
+      this.filteredNavLinks = [];
+      this.cdr.detectChanges();
+      return;
     }
     this.filteredNavLinks = this.navLinks.filter(link =>
       link.roles ? link.roles.includes(this.userRole!) : true
     ).map(link => ({
       ...link,
+      isActive: link.isActive || false, 
+      open: link.open || false,         
       children: link.children?.filter(child =>
         child.roles ? child.roles.includes(this.userRole!) : true
-      )
+      ).map(child => ({ ...child, isActive: child.isActive || false }))
     }));
     this.updateLinkActiveStates();
   }
 
   updateLinkActiveStates() {
-    this.filteredNavLinks = this.filteredNavLinks.map(link => {
-      let isActive = false;
-      if (link.route) {
-        isActive = this.router.isActive(link.route, { paths: 'exact', queryParams: 'subset', fragment: 'ignored', matrixParams: 'ignored' });
-      }
-      if (link.children && !isActive) {
-        isActive = link.children.some(child => child.route ? this.router.isActive(child.route, { paths: 'exact', queryParams: 'subset', fragment: 'ignored', matrixParams: 'ignored' }) : false);
-      }
-      return { ...link, isActive };
-    });
-  }
+    const currentUrl = this.router.url;
+    const defaultMatchOptions: IsActiveMatchOptions = {
+        paths: 'exact', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored'
+    };
+    const subsetMatchOptions: IsActiveMatchOptions = {
+        paths: 'subset', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored'
+    };
 
+    this.filteredNavLinks = this.filteredNavLinks.map(link => {
+      let localIsActive = false; 
+
+      if (link.route) {
+        const isDirectlyActive = this.router.isActive(link.route, defaultMatchOptions);
+        let isSubsetActiveAsParent = false;
+        if (link.children && link.children.length > 0) {
+          isSubsetActiveAsParent = this.router.isActive(link.route, subsetMatchOptions);
+        }
+        localIsActive = isDirectlyActive || isSubsetActiveAsParent;
+      }
+
+      let hasActiveChild = false;
+      if (link.children && link.children.length > 0) {
+        link.children = link.children.map(child => {
+          const childIsActive = child.route ? this.router.isActive(child.route, defaultMatchOptions) : false;
+          if (childIsActive) {
+            hasActiveChild = true;
+          }
+          return { ...child, isActive: childIsActive };
+        });
+        if (hasActiveChild) {
+          localIsActive = true;
+        }
+      }
+      
+     
+      const isOpen = link.open || (localIsActive && !!link.children?.length);
+
+      return { ...link, isActive: localIsActive, open: isOpen };
+    });
+    this.cdr.detectChanges();
+  }
+  
   isLinkActive(link?: NavLink): boolean {
     if (!link) return false;
-    return !!link.isActive;
+    return !!link.isActive; 
   }
 
   toggleAccordion(item: NavLink, event?: MouseEvent) {
     event?.preventDefault();
     item.open = !item.open;
+    this.cdr.detectChanges();
   }
 
   async closeMenu() {
@@ -141,18 +174,21 @@ export class MainLayoutPage implements OnInit, OnDestroy {
   }
 
   openPanel(panelName: 'settings' | 'notifications' | 'search') {
+
     if (panelName === 'settings') this.isSettingsPanelOpen = true;
     else if (panelName === 'notifications') this.isNotificationsPanelOpen = true;
     else if (panelName === 'search') this.isSearchPanelOpen = true;
   }
 
   closePanel(panelName: 'settings' | 'notifications' | 'search') {
+
     if (panelName === 'settings') this.isSettingsPanelOpen = false;
     else if (panelName === 'notifications') this.isNotificationsPanelOpen = false;
     else if (panelName === 'search') this.isSearchPanelOpen = false;
   }
 
   async openMobileSubMenu(ev: any) {
+
     const popover = await this.popoverCtrl.create({
       component: MobileActionsPopoverComponent,
       event: ev,
@@ -175,12 +211,12 @@ export class MainLayoutPage implements OnInit, OnDestroy {
       }
     }
   }
-
+  
   handleAvatarError(event: Event) {
+
     const element = event.target as HTMLImageElement;
     if (element) {
       element.src = 'assets/icon/default-avatar.svg';
     }
   }
-  }
-  
+}

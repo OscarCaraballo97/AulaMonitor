@@ -1,7 +1,6 @@
 package com.backend.IMonitoring.security;
 
 import com.backend.IMonitoring.model.User;
-import com.backend.IMonitoring.model.Rol;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

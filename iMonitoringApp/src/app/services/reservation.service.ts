@@ -4,18 +4,18 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { Reservation, ReservationStatus } from '../models/reservation.model';
-import { AuthService } from './auth.service'; 
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ReservationService {
   private apiUrl = `${environment.apiUrl}/reservations`;
-  private userApiUrl = `${environment.apiUrl}/users`; 
+  private userApiUrl = `${environment.apiUrl}/users`;
 
   constructor(
     private http: HttpClient,
-    private authService: AuthService 
+    private authService: AuthService
   ) { }
 
   private handleError(error: HttpErrorResponse, operation: string = 'operación de reserva') {
@@ -23,13 +23,17 @@ export class ReservationService {
     if (error.error instanceof ErrorEvent) {
       errorMessage += `Error: ${error.error.message}`;
     } else {
-      errorMessage += `Código ${error.status}, mensaje: ${error.error?.message || error.message || 'Error del servidor'}`;
+      
+      const serverErrorMessage = error.error?.message || error.error?.error || error.message;
+      errorMessage += `Código ${error.status}, mensaje: ${serverErrorMessage || 'Error del servidor desconocido'}`;
+      if (error.status === 0) {
+        errorMessage = `Error de red o CORS. No se pudo conectar con el servidor para ${operation}.`;
+      }
     }
-    console.error(errorMessage, error);
+    console.error(errorMessage, error); 
     return throwError(() => new Error(errorMessage));
   }
 
-  // --- Métodos CRUD ---
   getAllReservations(filters?: { classroomId?: string, userId?: string, status?: ReservationStatus }): Observable<Reservation[]> {
     let params = new HttpParams();
     if (filters?.classroomId) {
@@ -51,7 +55,6 @@ export class ReservationService {
   }
 
   createReservation(reservationData: Omit<Reservation, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'user' | 'classroom'>): Observable<Reservation> {
-
     return this.http.post<Reservation>(this.apiUrl, reservationData)
       .pipe(catchError(err => this.handleError(err, 'crear reserva')));
   }
@@ -62,16 +65,22 @@ export class ReservationService {
   }
 
   updateReservationStatus(id: string, status: ReservationStatus): Observable<Reservation> {
-    
-    return this.http.patch<Reservation>(`${this.apiUrl}/${id}/status`, { status })
+
+    let params = new HttpParams().set('status', status.toString());
+    return this.http.put<Reservation>(`${this.apiUrl}/${id}/status`, null, { params }) 
       .pipe(catchError(err => this.handleError(err, `actualizar estado de reserva ${id}`)));
   }
+
+  cancelMyReservation(id: string): Observable<Reservation> {
+    return this.http.patch<Reservation>(`${this.apiUrl}/${id}/cancel`, {})
+      .pipe(catchError(err => this.handleError(err, `cancelar mi reserva ${id}`)));
+  }
+
 
   deleteReservation(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`)
       .pipe(catchError(err => this.handleError(err, `eliminar reserva ${id}`)));
   }
-
 
   getUpcomingReservations(limit: number = 5): Observable<Reservation[]> {
     const params = new HttpParams()
@@ -84,7 +93,7 @@ export class ReservationService {
   }
 
   getMyUpcomingReservations(limit: number = 3): Observable<Reservation[]> {
-    const url = `${this.userApiUrl}/me/reservations`; 
+    const url = `${this.userApiUrl}/me/reservations`;
     const params = new HttpParams()
       .set('status', ReservationStatus.CONFIRMADA.toString())
       .set('sort', 'startTime,asc')

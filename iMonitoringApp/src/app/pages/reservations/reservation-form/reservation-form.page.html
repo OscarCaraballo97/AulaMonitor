@@ -17,7 +17,12 @@
         </p>
       </div>
 
-      <form [formGroup]="reservationForm" (ngSubmit)="onSubmit()"
+      <div *ngIf="isLoadingInitialData" class="py-8 text-center">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p class="mt-2 text-gray-500 dark:text-gray-400">Cargando formulario...</p>
+      </div>
+
+      <form [formGroup]="reservationForm" (ngSubmit)="onSubmit()" *ngIf="!isLoadingInitialData"
             class="p-6 space-y-6 bg-white rounded-lg shadow dark:bg-kwd-darker">
 
         <div *ngIf="isLoading && isEditMode" class="py-8 text-center">
@@ -31,31 +36,41 @@
             <select id="classroomId" formControlName="classroomId" required
                     class="block w-full py-2 pl-3 pr-10 mt-1 text-base text-gray-900 border-gray-300 rounded-md dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
                     [ngClass]="{'border-red-500 dark:border-kwd-red': reservationForm.get('classroomId')?.invalid && reservationForm.get('classroomId')?.touched}">
-              <option [ngValue]="null" disabled>Selecciona un aula</option>
-              <option *ngFor="let classroom of classrooms" [value]="classroom.id">{{ classroom.name }} (Ed: {{classroom.building?.name || classroom.buildingId}})</option>
+              <option [ngValue]="null" disabled>Selecciona un aula...</option>
+              <option *ngFor="let classroom of classrooms" [value]="classroom.id">
+                {{ classroom.name }}
+                <span *ngIf="classroom.building?.name"> (Ed: {{ classroom.building?.name }})</span>
+                <span *ngIf="!classroom.building?.name && classroom.buildingId"> (Ed. ID: {{ classroom.buildingId }})</span>
+              </option>
             </select>
+            <div *ngIf="classrooms.length === 0 && !isLoadingInitialData" class="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+              No hay aulas disponibles para seleccionar.
+            </div>
             <div *ngIf="reservationForm.get('classroomId')?.invalid && reservationForm.get('classroomId')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
               <small *ngIf="reservationForm.get('classroomId')?.errors?.['required']">El aula es requerida.</small>
             </div>
           </div>
 
           <div *ngIf="userRole === RolEnum.ADMIN">
-            <label for="userId" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Usuario (Admin)</label>
-            <input type="text" id="userId" formControlName="userId" placeholder="ID del usuario"
+            <label for="userId" class="block text-sm font-medium text-gray-700 dark:text-gray-300">ID de Usuario (Admin)</label>
+            <input type="text" id="userId" formControlName="userId" placeholder="ID del usuario para la reserva"
                    class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
                    [ngClass]="{'border-red-500 dark:border-kwd-red': reservationForm.get('userId')?.invalid && reservationForm.get('userId')?.touched}">
             <div *ngIf="reservationForm.get('userId')?.invalid && reservationForm.get('userId')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
-              <small *ngIf="reservationForm.get('userId')?.errors?.['required']">El ID de usuario es requerido para Admin.</small>
+              <small *ngIf="reservationForm.get('userId')?.errors?.['required']">El ID de usuario es requerido si lo especifica un Admin.</small>
             </div>
           </div>
 
           <div>
             <label for="startTime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha y Hora de Inicio</label>
-            <ion-datetime-button datetime="startTimePicker" class="mt-1"></ion-datetime-button>
+            <ion-datetime-button datetime="startTimePicker" class="mt-1 custom-datetime-button"></ion-datetime-button>
             <ion-modal [keepContentsMounted]="true">
               <ng-template>
-                <ion-datetime id="startTimePicker" formControlName="startTime" displayFormat="DD/MM/YYYY HH:mm" pickerFormat="DD MMM YY HH:mm"
-                              [min]="minDateValue"></ion-datetime>
+                <ion-datetime id="startTimePicker" formControlName="startTime"
+                              presentation="date-time"
+                              [min]="minDateValue"
+                              hourCycle="h23"
+                              doneText="Aceptar" cancelText="Cancelar"></ion-datetime>
               </ng-template>
             </ion-modal>
             <div *ngIf="reservationForm.get('startTime')?.invalid && reservationForm.get('startTime')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
@@ -65,11 +80,14 @@
 
           <div>
             <label for="endTime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha y Hora de Fin</label>
-            <ion-datetime-button datetime="endTimePicker" class="mt-1"></ion-datetime-button>
+            <ion-datetime-button datetime="endTimePicker" class="mt-1 custom-datetime-button"></ion-datetime-button>
             <ion-modal [keepContentsMounted]="true">
               <ng-template>
-                <ion-datetime id="endTimePicker" formControlName="endTime" displayFormat="DD/MM/YYYY HH:mm" pickerFormat="DD MMM YY HH:mm"
-                              [min]="minEndDateValue"></ion-datetime>
+                <ion-datetime id="endTimePicker" formControlName="endTime"
+                              presentation="date-time"
+                              [min]="minEndDateValue"
+                              hourCycle="h23"
+                              doneText="Aceptar" cancelText="Cancelar"></ion-datetime>
               </ng-template>
             </ion-modal>
             <div *ngIf="reservationForm.get('endTime')?.invalid && reservationForm.get('endTime')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
@@ -77,17 +95,17 @@
               <small *ngIf="reservationForm.get('endTime')?.hasError('dateTimeOrder')">La hora de fin debe ser posterior a la hora de inicio.</small>
             </div>
              <div *ngIf="reservationForm.hasError('invalidDateTimeOrder') && !reservationForm.get('endTime')?.hasError('dateTimeOrder')" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
-                <small>La hora de fin debe ser posterior a la hora de inicio (error de grupo).</small>
+                <small>La hora de fin debe ser posterior a la hora de inicio.</small>
             </div>
           </div>
 
            <div>
             <label for="purpose" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Propósito (Opcional)</label>
-            <textarea id="purpose" formControlName="purpose" rows="3" placeholder="Ej: Clase de Cálculo, Reunión de proyecto, Sesión de estudio..."
+            <textarea id="purpose" formControlName="purpose" rows="3" placeholder="Ej: Clase de Cálculo, Reunión de proyecto..."
                       class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"></textarea>
           </div>
 
-          <div *ngIf="isEditMode && userRole === RolEnum.ADMIN">
+          <div *ngIf="isEditMode && userRole === RolEnum.ADMIN && reservationForm.get('status')">
             <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado de la Reserva</label>
             <select id="status" formControlName="status" required
                     class="block w-full py-2 pl-3 pr-10 mt-1 text-base text-gray-900 border-gray-300 rounded-md dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm">
@@ -96,7 +114,6 @@
               </option>
             </select>
           </div>
-
 
           <div class="flex flex-col pt-4 space-y-3 sm:space-y-0 sm:flex-row sm:justify-end sm:space-x-3">
             <button type="button" (click)="cancel()"
