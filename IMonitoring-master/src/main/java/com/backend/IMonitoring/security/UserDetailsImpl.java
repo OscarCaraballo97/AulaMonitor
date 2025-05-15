@@ -1,6 +1,7 @@
 package com.backend.IMonitoring.security;
 
 import com.backend.IMonitoring.model.User;
+import com.backend.IMonitoring.model.Rol;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,36 +18,43 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
+        if (user.getRole() == null) { 
+            return Collections.emptyList();
+        }
+       
         return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
     }
 
     @Override
     public String getPassword() {
-        return user.getPassword();
+        return user.getPassword(); 
     }
 
     @Override
-    public String getUsername() {
-        return user.getEmail();
+    public String getUsername() { 
+        return user.getEmail(); 
     }
 
     @Override
-    public boolean isAccountNonExpired() {
-        return true;
+    public boolean isAccountNonExpired() { return true; }
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+    @Override
+    public boolean isEnabled() { return true; }
+
+
+    public User getUserEntity() {
+        return this.user;
     }
 
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
+
+    public String getId() {
+        return this.user.getId();
     }
 
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return true;
+    public String getName() { 
+        return this.user.getName(); 
     }
 }

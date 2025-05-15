@@ -1,5 +1,6 @@
 package com.backend.IMonitoring.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,15 +15,20 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(name = "building")
 public class Building {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private String id; 
 
-    private String name;
+    @Column(nullable = false)
+    private String name; 
+
+    @Column(nullable = false)
     private String location;
 
     @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
     @Builder.Default
     private List<Classroom> classrooms = new ArrayList<>();
 }

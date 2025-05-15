@@ -3,20 +3,31 @@ package com.backend.IMonitoring.controller;
 import com.backend.IMonitoring.model.Reservation;
 import com.backend.IMonitoring.model.User;
 import com.backend.IMonitoring.model.Rol;
+import com.backend.IMonitoring.model.ReservationStatus;
+import com.backend.IMonitoring.security.UserDetailsImpl;
+import com.backend.IMonitoring.service.ReservationService;
 import com.backend.IMonitoring.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final ReservationService reservationService;
 
     @GetMapping
     public ResponseEntity<List<User>> getAllUsers() {
@@ -57,6 +68,50 @@ public class UserController {
 
     @GetMapping("/{userId}/reservations")
     public ResponseEntity<List<Reservation>> getUserReservations(@PathVariable String userId) {
-        return ResponseEntity.ok(userService.getUserReservations(userId));
+        return ResponseEntity.ok(reservationService.getReservationsByUser(userId));
+    }
+
+    @GetMapping("/me/reservations")
+    public ResponseEntity<List<Reservation>> getCurrentUserReservations(
+            @RequestParam(name = "status", required = false) ReservationStatus status,
+            @RequestParam(name = "sort", required = false, defaultValue = "startTime,asc") String sort,
+            @RequestParam(name = "limit", required = false, defaultValue = "10") int limit,
+            @RequestParam(name = "futureOnly", required = false, defaultValue = "false") boolean futureOnly
+    ) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        String currentUserId = userDetails.getId();
+
+       
+        String sortField = "startTime";
+        String sortDirection = "asc";   
+        if (sort != null && sort.contains(",")) {
+            String[] sortParams = sort.split(",");
+            sortField = sortParams[0];
+            if (sortParams.length > 1) {
+                sortDirection = sortParams[1];
+            }
+        }
+        
+       
+        List<Reservation> userReservations = reservationService.getFilteredUserReservations(
+            currentUserId,
+            status,
+            sortDirection,
+            sortField,
+            0, 
+            limit, 
+            futureOnly
+        );
+        
+       
+        List<Reservation> result = userReservations.stream().limit(limit).collect(Collectors.toList());
+
+
+        return ResponseEntity.ok(result);
     }
 }

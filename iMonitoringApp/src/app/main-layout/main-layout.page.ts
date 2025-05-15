@@ -1,4 +1,3 @@
-
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { IonicModule, MenuController, Platform, PopoverController, NavController } from '@ionic/angular';
@@ -9,7 +8,7 @@ import { Rol } from '../models/rol.model';
 import { User } from '../models/user.model';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
-import { SettingsPanelComponent } from '../components/settings-panel/settings-panel.component';
+import { SettingsPanelComponent } from '../components/settings-panel/settings-panel.component'; 
 import { MobileActionsPopoverComponent } from '../components/mobile-actions-popover/mobile-actions-popover.component';
 
 
@@ -33,20 +32,20 @@ interface NavLink {
     IonicModule,
     CommonModule,
     RouterModule,
-    SettingsPanelComponent, 
+    SettingsPanelComponent,
   ],
 })
 export class MainLayoutPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   appName = 'IMonitoring';
   userRole: Rol | null = null;
-  currentUser: User | null = null; 
+  currentUser: User | null = null;
 
   isUserDropdownOpen = false;
   isSettingsPanelOpen = false;
   isNotificationsPanelOpen = false;
   isSearchPanelOpen = false;
-  showPageLoading = false; 
+  showPageLoading = false;
 
   navLinks: NavLink[] = [
     { title: 'Dashboard', icon: 'home-outline', route: '/app/dashboard', roles: [Rol.ADMIN, Rol.PROFESOR, Rol.TUTOR, Rol.ESTUDIANTE] },
@@ -72,15 +71,16 @@ export class MainLayoutPage implements OnInit, OnDestroy {
     this.authService.getCurrentUserRole().pipe(takeUntil(this.destroy$)).subscribe((role: Rol | null) => {
       this.userRole = role;
       this.updateFilteredNavLinks();
+      this.cdr.detectChanges();
     });
 
-
-    this.currentUser = {
-      email: 'admin@example.com',
-      role: Rol.ADMIN,
-      name: 'Admin Principal',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/57622665?s=460&u=8f581f4c4acd4c18c33a87b3e6476112325e8b38&v=4' // URL de ejemplo
-    };
+    this.authService.getCurrentUser().pipe(
+      takeUntil(this.destroy$)
+    ).subscribe((user: User | null) => {
+      this.currentUser = user;
+      console.log('MainLayoutPage: currentUser actualizado por AuthService ->', this.currentUser);
+      this.cdr.detectChanges();
+    });
 
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd),
@@ -120,14 +120,12 @@ export class MainLayoutPage implements OnInit, OnDestroy {
       if (link.children && !isActive) {
         isActive = link.children.some(child => child.route ? this.router.isActive(child.route, { paths: 'exact', queryParams: 'subset', fragment: 'ignored', matrixParams: 'ignored' }) : false);
       }
-
       return { ...link, isActive };
     });
   }
 
   isLinkActive(link?: NavLink): boolean {
     if (!link) return false;
-
     return !!link.isActive;
   }
 
@@ -171,8 +169,18 @@ export class MainLayoutPage implements OnInit, OnDestroy {
         case 'search': this.openPanel('search'); break;
         case 'settings': this.openPanel('settings'); break;
         case 'theme': this.themeService.toggleTheme(); break;
+        case 'logout':
+          this.authService.logout();
+          break;
       }
     }
   }
+
+  handleAvatarError(event: Event) {
+    const element = event.target as HTMLImageElement;
+    if (element) {
+      element.src = 'assets/icon/default-avatar.svg';
+    }
+  }
+  }
   
-}

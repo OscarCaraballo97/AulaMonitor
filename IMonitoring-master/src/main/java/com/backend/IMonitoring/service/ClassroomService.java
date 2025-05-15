@@ -1,33 +1,95 @@
 package com.backend.IMonitoring.service;
 
+import com.backend.IMonitoring.dto.ClassroomAvailabilitySummaryDTO;
 import com.backend.IMonitoring.dto.AvailabilityRequest;
 import com.backend.IMonitoring.model.Classroom;
 import com.backend.IMonitoring.model.ClassroomType;
+import com.backend.IMonitoring.model.Building;
 import com.backend.IMonitoring.repository.ClassroomRepository;
+import com.backend.IMonitoring.repository.BuildingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ClassroomService {
+
     private final ClassroomRepository classroomRepository;
+    private final BuildingRepository buildingRepository;
 
     public List<Classroom> getAllClassrooms() {
         return classroomRepository.findAll();
     }
 
-    public List<Classroom> getAvailableNow() {
-        return classroomRepository.findAvailableNow();
+    public Classroom getClassroomById(String id) {
+        return classroomRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Aula no encontrada con ID: " + id));
     }
 
-    public List<Classroom> getUnavailableNow() {
-        return classroomRepository.findUnavailableNow();
+    @Transactional
+    public Classroom createClassroom(Classroom classroom) {
+        String determinedBuildingId = null;
+        if (classroom.getBuilding() != null && classroom.getBuilding().getId() != null) {
+            determinedBuildingId = classroom.getBuilding().getId();
+        }
+        // Si tu entidad Classroom tuviera un campo buildingId directo y lo prefieres:
+        // else if (classroom.getBuildingId() != null) { // Asumiendo que Classroom tiene un método getBuildingId()
+        //     determinedBuildingId = classroom.getBuildingId();
+        // }
+
+        if (determinedBuildingId == null) {
+            throw new IllegalArgumentException("Se requiere la asociación a un edificio (a través de building.id o buildingId) para crear un aula.");
+        }
+
+        // Usar una variable final para la expresión lambda
+        final String finalBuildingIdToFind = determinedBuildingId;
+        Building building = buildingRepository.findById(finalBuildingIdToFind)
+                .orElseThrow(() -> new RuntimeException("Edificio no encontrado con ID: " + finalBuildingIdToFind + " al crear aula."));
+        classroom.setBuilding(building); // Asegura que el objeto Building completo esté asociado
+
+        return classroomRepository.save(classroom);
+    }
+
+    @Transactional
+    public Classroom updateClassroom(String id, Classroom classroomDetails) {
+        Classroom classroomToUpdate = getClassroomById(id);
+        classroomToUpdate.setName(classroomDetails.getName());
+        classroomToUpdate.setCapacity(classroomDetails.getCapacity());
+        classroomToUpdate.setType(classroomDetails.getType());
+        classroomToUpdate.setResources(classroomDetails.getResources());
+
+        String newBuildingId = null;
+        if (classroomDetails.getBuilding() != null && classroomDetails.getBuilding().getId() != null) {
+            newBuildingId = classroomDetails.getBuilding().getId();
+        }
+        // Si tu entidad Classroom tuviera un campo buildingId directo y lo prefieres:
+        // else if (classroomDetails.getBuildingId() != null) { // Asumiendo que Classroom tiene getBuildingId()
+        //    newBuildingId = classroomDetails.getBuildingId();
+        // }
+
+        if (newBuildingId != null) {
+            if (classroomToUpdate.getBuilding() == null || !classroomToUpdate.getBuilding().getId().equals(newBuildingId)) {
+                final String finalNewBuildingIdForUpdate = newBuildingId; // Variable final para la lambda
+                Building building = buildingRepository.findById(finalNewBuildingIdForUpdate)
+                        .orElseThrow(() -> new RuntimeException("Edificio no encontrado con ID: " + finalNewBuildingIdForUpdate + " al actualizar aula."));
+                classroomToUpdate.setBuilding(building);
+            }
+        }
+        // else {
+        //    // Si se quiere permitir desasociar un edificio, se enviaría un buildingId nulo
+        //    // y aquí se pondría classroomToUpdate.setBuilding(null);
+        // }
+
+        return classroomRepository.save(classroomToUpdate);
+    }
+
+    @Transactional
+    public void deleteClassroom(String id) {
+        classroomRepository.deleteById(id);
     }
 
     public List<Classroom> getClassroomsByType(ClassroomType type) {
@@ -35,53 +97,36 @@ public class ClassroomService {
     }
 
     public List<Classroom> getClassroomsByMinCapacity(Integer minCapacity) {
+        if (minCapacity == null || minCapacity < 0) {
+            throw new IllegalArgumentException("La capacidad mínima debe ser un número positivo.");
+        }
         return classroomRepository.findByCapacityGreaterThanEqual(minCapacity);
     }
 
-    public Classroom getClassroomById(String id) {
-        return classroomRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Classroom not found"));
+    public List<Classroom> getAvailableNow() {
+        return classroomRepository.findAvailableNow(LocalDateTime.now());
     }
 
-    public Classroom createClassroom(Classroom classroom) {
-        return classroomRepository.save(classroom);
+    public List<Classroom> getUnavailableNow() {
+        return classroomRepository.findUnavailableNow(LocalDateTime.now());
     }
-
-    public Classroom updateClassroom(String id, Classroom classroom) {
-        Classroom existing = getClassroomById(id);
-        existing.setName(classroom.getName());
-        existing.setCapacity(classroom.getCapacity());
-        existing.setType(classroom.getType());
-        existing.setResources(classroom.getResources());
-        existing.setBuilding(classroom.getBuilding());
-        return classroomRepository.save(existing);
-    }
-
-    public void deleteClassroom(String id) {
-        classroomRepository.deleteById(id);
-    }
-
+    
     public boolean checkAvailability(AvailabilityRequest request) {
-        LocalDateTime start = parseDateTime(request.getDate(), request.getStartTime());
-        LocalDateTime end = parseDateTime(request.getDate(), request.getEndTime());
-
-        if (start.isAfter(end)) {
-            throw new IllegalArgumentException("La hora de inicio debe ser antes que la hora de fin.");
+        if (request == null || request.getClassroomId() == null || request.getStartTime() == null || request.getEndTime() == null) {
+            throw new IllegalArgumentException("Datos incompletos para verificar disponibilidad.");
         }
-
-        if (Duration.between(start, end).toHours() != 2) {
-            throw new IllegalArgumentException("El bloque de tiempo debe ser de 2 horas exactas.");
-        }
-
-        return classroomRepository.isAvailable(request.getClassroomId(), start, end);
+        return classroomRepository.isAvailable(
+            request.getClassroomId(),
+            request.getStartTime(),
+            request.getEndTime()
+        );
     }
 
-    private LocalDateTime parseDateTime(String date, String time) {
-        try {
-            String dateTimeString = date + "T" + time + ":00";
-            return LocalDateTime.parse(dateTimeString, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Formato de fecha u hora inválido.");
-        }
+    public ClassroomAvailabilitySummaryDTO getAvailabilitySummary() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Classroom> available = classroomRepository.findAvailableNow(now);
+        List<Classroom> unavailable = classroomRepository.findUnavailableNow(now);
+        long total = classroomRepository.count();
+        return new ClassroomAvailabilitySummaryDTO(available.size(), unavailable.size(), (int) total);
     }
 }

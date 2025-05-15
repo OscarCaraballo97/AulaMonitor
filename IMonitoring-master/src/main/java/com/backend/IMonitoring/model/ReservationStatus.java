@@ -1,5 +1,8 @@
 package com.backend.IMonitoring.model;
 
 public enum ReservationStatus {
-    CONFIRMADA, PENDIENTE, RECHAZADA
+    CONFIRMADA,
+    PENDIENTE,
+    RECHAZADA,
+    CANCELADA 
 }

@@ -6,6 +6,7 @@ import com.backend.IMonitoring.repository.BuildingRepository;
 import com.backend.IMonitoring.repository.ClassroomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -21,26 +22,28 @@ public class BuildingService {
 
     public Building getBuildingById(String id) {
         return buildingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Edificio no encontrado"));
+                .orElseThrow(() -> new RuntimeException("Edificio no encontrado con ID: " + id));
     }
 
+    @Transactional
     public Building createBuilding(Building building) {
         return buildingRepository.save(building);
     }
 
-    public Building updateBuilding(String id, Building building) {
-        Building existingBuilding = getBuildingById(id);
-        existingBuilding.setName(building.getName());
-        existingBuilding.setLocation(building.getLocation());
-        return buildingRepository.save(existingBuilding);
+    @Transactional
+    public Building updateBuilding(String id, Building buildingDetails) {
+        Building building = getBuildingById(id);
+        building.setName(buildingDetails.getName());
+        building.setLocation(buildingDetails.getLocation());
+        return buildingRepository.save(building);
     }
 
+    @Transactional
     public void deleteBuilding(String id) {
-        buildingRepository.deleteById(id);
+           buildingRepository.deleteById(id);
     }
 
     public List<Classroom> getClassroomsByBuilding(String buildingId) {
-        Building building = getBuildingById(buildingId);
-        return building.getClassrooms();
+        return classroomRepository.findByBuilding_Id(buildingId); 
     }
 }

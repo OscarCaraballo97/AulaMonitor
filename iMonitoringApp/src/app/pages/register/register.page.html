@@ -3,7 +3,7 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/login" text="" icon="arrow-back-outline"></ion-back-button>
     </ion-buttons>
-    <ion-title class="dark:text-kwd-light">Crear Cuenta</ion-title>
+    <ion-title class="dark:text-kwd-light">Crear Nueva Cuenta</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -14,8 +14,24 @@
         <h2 class="text-2xl font-bold text-center text-gray-900 sm:text-3xl dark:text-kwd-light">
           Regístrate en IMonitoring
         </h2>
+        <p class="mt-2 text-sm text-center text-gray-600 dark:text-gray-400">
+          (Modo de prueba: Selección de rol habilitada)
+        </p>
       </div>
       <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-6">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo</label>
+          <div class="mt-1">
+            <input id="name" type="text" formControlName="name" autocomplete="name" required
+                   class="block w-full px-3 py-2 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md shadow-sm appearance-none dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light dark:placeholder-gray-400 focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                   [ngClass]="{'border-red-500 dark:border-kwd-red': name?.invalid && (name?.dirty || name?.touched)}">
+          </div>
+          <div *ngIf="name?.invalid && (name?.dirty || name?.touched)" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+            <small *ngIf="name?.errors?.['required']">El nombre es requerido.</small>
+            <small *ngIf="name?.errors?.['minlength']">El nombre debe tener al menos 3 caracteres.</small>
+          </div>
+        </div>
+
         <div>
           <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Correo Electrónico</label>
           <div class="mt-1">
@@ -59,9 +75,17 @@
         </div>
 
         <div>
-          <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 sr-only">Rol (Estudiante)</label>
-          <input type="hidden" formControlName="role">
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Registrándose como: Estudiante</p>
+          <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selecciona un Rol</label>
+          <select id="role" formControlName="role" required
+                  class="block w-full py-2 pl-3 pr-10 mt-1 text-base text-gray-900 border-gray-300 rounded-md dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                  [ngClass]="{'border-red-500 dark:border-kwd-red': role?.invalid && (role?.dirty || role?.touched)}">
+            <option *ngFor="let roleItem of rolesForSelect" [ngValue]="roleItem.value">
+              {{ roleItem.key | titlecase }}
+            </option>
+          </select>
+          <div *ngIf="role?.invalid && (role?.dirty || role?.touched)" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+            <small *ngIf="role?.errors?.['required']">El rol es requerido.</small>
+          </div>
         </div>
 
 
@@ -73,7 +97,7 @@
           <button type="submit" [disabled]="registerForm.invalid || isLoading"
                   class="flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-sm bg-kwd-blue-DEFAULT hover:bg-kwd-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kwd-blue-500 dark:bg-kwd-blue-600 dark:hover:bg-kwd-blue-700 disabled:opacity-50">
             <ion-spinner *ngIf="isLoading" name="dots" class="w-5 h-5 mr-3 -ml-1 text-white"></ion-spinner>
-            {{ isLoading ? 'Registrando...' : 'Crear Cuenta de Estudiante' }}
+            {{ isLoading ? 'Registrando...' : 'Crear Cuenta' }}
           </button>
         </div>
       </form>

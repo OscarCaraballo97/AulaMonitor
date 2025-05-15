@@ -1,13 +1,150 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>reservation-list</ion-title>
+<ion-header class="md:hidden">
+  <ion-toolbar color="primary" class="dark:bg-kwd-darker">
+    <ion-buttons slot="start">
+      <ion-menu-button menu="kwd-sidebar"></ion-menu-button>
+    </ion-buttons>
+    <ion-title class="dark:text-kwd-light">Reservas</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">reservation-list</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="bg-gray-100 dark:bg-kwd-dark">
+  <ion-refresher slot="fixed" (ionRefresh)="handleRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="p-4 md:p-6 lg:p-8">
+    <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
+      <h1 class="text-2xl font-semibold text-gray-800 dark:text-kwd-light">
+        Gestión de Reservas
+      </h1>
+      <div class="flex flex-col w-full gap-2 md:w-auto md:flex-row">
+        <div *ngIf="userRole === RolEnum.ADMIN || userRole === RolEnum.PROFESOR" class="w-full md:w-auto">
+          <label for="statusFilter" class="sr-only">Filtrar por estado</label>
+          <select id="statusFilter" [(ngModel)]="filterStatus" (ngModelChange)="onFilterChange()"
+                  class="block w-full py-2 pl-3 pr-10 text-base border-gray-300 rounded-md dark:bg-kwd-darker dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm">
+            <option *ngFor="let statusOpt of allStatusesForFilter" [value]="statusOpt.value">{{ statusOpt.display }}</option>
+          </select>
+        </div>
+        <button *ngIf="canCreateReservation()" (click)="navigateToAddReservation()"
+                class="flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white rounded-md md:w-auto bg-kwd-blue-DEFAULT hover:bg-kwd-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kwd-blue-500 dark:bg-kwd-blue-600 dark:hover:bg-kwd-blue-700">
+          <ion-icon name="add-circle-outline" class="w-5 h-5 mr-2" aria-hidden="true"></ion-icon>
+          Nueva Reserva
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <ion-button expand="block" fill="outline" (click)="togglePendingSection()" color="secondary">
+        <ion-icon [name]="showPendingSection ? 'eye-off-outline' : 'eye-outline'" slot="start" aria-hidden="true"></ion-icon>
+        {{ showPendingSection ? 'Ocultar' : 'Ver' }}
+        {{ (userRole === RolEnum.ADMIN || userRole === RolEnum.PROFESOR) ? 'Todas las Pendientes' : 'Mis Solicitudes Pendientes' }}
+      </ion-button>
+    </div>
+
+    <div *ngIf="showPendingSection" class="mt-6">
+      <h2 class="mb-3 text-lg font-semibold text-gray-700 dark:text-kwd-light">
+        {{ (userRole === RolEnum.ADMIN || userRole === RolEnum.PROFESOR) ? 'Reservas Pendientes (Todas)' : 'Mis Solicitudes Pendientes' }}
+      </h2>
+      <div *ngIf="isLoadingPending && pendingReservations.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
+        <ion-spinner name="crescent" class="w-8 h-8"></ion-spinner>
+        <p class="mt-2">Cargando reservas pendientes...</p>
+      </div>
+      <div *ngIf="!isLoadingPending && pendingReservations.length === 0" class="p-8 text-center text-gray-500 bg-white rounded-lg shadow-md dark:bg-kwd-darker dark:text-gray-400">
+        <ion-icon name="checkmark-done-circle-outline" class="w-12 h-12 mx-auto text-green-500" aria-hidden="true"></ion-icon>
+        <p class="mt-2">No hay reservas pendientes en este momento.</p>
+      </div>
+      <div *ngIf="!isLoadingPending && pendingReservations.length > 0" class="overflow-x-auto bg-white rounded-lg shadow dark:bg-kwd-darker">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-kwd-blue-800">
+          <thead class="bg-gray-50 dark:bg-kwd-dark">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Aula</th>
+              <th scope="col" *ngIf="userRole === RolEnum.ADMIN || userRole === RolEnum.PROFESOR" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Solicitante</th>
+              <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Inicio</th>
+              <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Fin</th>
+              <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase dark:text-gray-400">Acciones (Admin)</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200 dark:bg-kwd-darker dark:divide-kwd-blue-800">
+            <tr *ngFor="let reservation of pendingReservations" class="hover:bg-gray-50 dark:hover:bg-kwd-dark">
+              <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-kwd-light">{{ reservation.classroom?.name || reservation.classroomId }}</td>
+              <td *ngIf="userRole === RolEnum.ADMIN || userRole === RolEnum.PROFESOR" class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-300">{{ reservation.user?.name || reservation.user?.email || reservation.userId }}</td>
+              <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-300">{{ reservation.startTime | date:'dd/MM/yy HH:mm' }}</td>
+              <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-300">{{ reservation.endTime | date:'dd/MM/yy HH:mm' }}</td>
+              <td class="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+                <button *ngIf="canManageStatus(reservation)" (click)="confirmAction(reservation, ReservationStatusEnum.CONFIRMADA, 'pending')" class="text-green-500 hover:text-green-700 dark:text-kwd-green dark:hover:text-green-400" title="Confirmar Reserva">
+                  <ion-icon name="checkmark-circle-outline" class="w-5 h-5" aria-hidden="true"></ion-icon>
+                </button>
+                <button *ngIf="canManageStatus(reservation)" (click)="confirmAction(reservation, ReservationStatusEnum.RECHAZADA, 'pending')" class="ml-3 text-red-600 hover:text-red-800 dark:text-kwd-red dark:hover:text-red-400" title="Rechazar Reserva">
+                  <ion-icon name="ban-outline" class="w-5 h-5" aria-hidden="true"></ion-icon>
+                </button>
+                 <span *ngIf="!canManageStatus(reservation)" class="text-xs italic text-gray-400">Pendiente</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2 class="mt-8 mb-3 text-lg font-semibold text-gray-700 dark:text-kwd-light">
+      {{ filterStatus ? (filterStatus.replace('_', ' ') | titlecase) : 'Todas las Reservas (según filtro)' }}
+    </h2>
+    <div *ngIf="isLoading && reservations.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
+      <ion-spinner name="crescent" class="w-8 h-8"></ion-spinner>
+      <p class="mt-2">Cargando reservas...</p>
+    </div>
+    <div *ngIf="!isLoading && reservations.length === 0 && !errorMessage" class="p-8 text-center text-gray-500 bg-white rounded-lg shadow-md dark:bg-kwd-darker dark:text-gray-400 mt-6">
+      <ion-icon name="information-circle-outline" class="w-12 h-12 mx-auto" aria-hidden="true"></ion-icon>
+      <p class="mt-2">No hay reservas que coincidan con los filtros actuales.</p>
+    </div>
+    <div *ngIf="errorMessage && !isLoading" class="p-4 my-4 text-sm text-center text-red-700 bg-red-100 rounded-lg dark:text-kwd-red dark:bg-red-900/30">
+      {{ errorMessage }}
+    </div>
+    <div *ngIf="!isLoading && reservations.length > 0" class="mt-6 overflow-x-auto bg-white rounded-lg shadow dark:bg-kwd-darker">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-kwd-blue-800">
+        <thead class="bg-gray-50 dark:bg-kwd-dark">
+          <tr>
+            <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Aula</th>
+            <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Usuario</th>
+            <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Inicio</th>
+            <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Fin</th>
+            <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-gray-400">Estado</th>
+            <th scope="col" class="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase dark:text-gray-400">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200 dark:bg-kwd-darker dark:divide-kwd-blue-800">
+          <tr *ngFor="let reservation of reservations" class="hover:bg-gray-50 dark:hover:bg-kwd-dark">
+            <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-kwd-light">{{ reservation.classroom?.name || reservation.classroomId }}</td>
+            <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-300">{{ reservation.user?.name || reservation.user?.email || reservation.userId }}</td>
+            <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-300">{{ reservation.startTime | date:'dd/MM/yy HH:mm' }}</td>
+            <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap dark:text-gray-300">{{ reservation.endTime | date:'dd/MM/yy HH:mm' }}</td>
+            <td class="px-6 py-4 text-sm whitespace-nowrap">
+              <span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full"
+                    [ngClass]="{
+                      'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100': reservation.status === ReservationStatusEnum.CONFIRMADA,
+                      'bg-yellow-100 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100': reservation.status === ReservationStatusEnum.PENDIENTE,
+                      'bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100': reservation.status === ReservationStatusEnum.RECHAZADA,
+                      'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200': reservation.status === ReservationStatusEnum.CANCELADA
+                    }">
+                {{ reservation.status.replace('_', ' ') | titlecase }}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
+              <button *ngIf="canEditReservation(reservation)" (click)="navigateToEditReservation(reservation.id)" class="text-kwd-blue-600 hover:text-kwd-blue-800 dark:text-kwd-blue-400 dark:hover:text-kwd-blue-300" title="Editar">
+                <ion-icon name="create-outline" class="w-5 h-5" aria-hidden="true"></ion-icon>
+              </button>
+              <button *ngIf="canCancelReservation(reservation)" (click)="confirmAction(reservation, ReservationStatusEnum.CANCELADA, 'main')" class="ml-3 text-orange-500 hover:text-orange-700 dark:text-kwd-color-orange dark:hover:text-orange-400" title="Cancelar Reserva">
+                <ion-icon name="close-circle-outline" class="w-5 h-5" aria-hidden="true"></ion-icon>
+              </button>
+              <button *ngIf="canManageStatus(reservation)" (click)="confirmAction(reservation, ReservationStatusEnum.CONFIRMADA, 'main')" class="ml-3 text-green-500 hover:text-green-700 dark:text-kwd-green dark:hover:text-green-400" title="Confirmar Reserva">
+                <ion-icon name="checkmark-circle-outline" class="w-5 h-5" aria-hidden="true"></ion-icon>
+              </button>
+              <button *ngIf="canManageStatus(reservation)" (click)="confirmAction(reservation, ReservationStatusEnum.RECHAZADA, 'main')" class="ml-3 text-red-600 hover:text-red-800 dark:text-kwd-red dark:hover:text-red-400" title="Rechazar Reserva">
+                <ion-icon name="ban-outline" class="w-5 h-5" aria-hidden="true"></ion-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </ion-content>

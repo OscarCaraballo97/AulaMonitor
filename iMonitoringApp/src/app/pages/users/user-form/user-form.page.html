@@ -1,13 +1,105 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>user-form</ion-title>
+<ion-header class="md:hidden">
+  <ion-toolbar color="primary" class="dark:bg-kwd-darker">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/app/users"></ion-back-button>
+    </ion-buttons>
+    <ion-title class="dark:text-kwd-light">{{ pageTitle }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">user-form</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="bg-gray-100 dark:bg-kwd-dark">
+  <div class="p-4 md:p-6 lg:p-8">
+    <div class="max-w-2xl mx-auto">
+      <div class="mb-6">
+        <h1 class="text-2xl font-semibold text-gray-800 dark:text-kwd-light">{{ pageTitle }}</h1>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          {{ isEditMode ? 'Actualiza los detalles del usuario.' : 'Completa la información para crear un nuevo usuario.' }}
+        </p>
+      </div>
+
+      <form [formGroup]="userForm" (ngSubmit)="onSubmit()"
+            class="p-6 space-y-6 bg-white rounded-lg shadow dark:bg-kwd-darker">
+
+        <div *ngIf="isLoading && isEditMode" class="py-8 text-center">
+          <ion-spinner name="crescent"></ion-spinner>
+          <p class="mt-2 text-gray-500 dark:text-gray-400">Cargando datos del usuario...</p>
+        </div>
+
+        <ng-container *ngIf="!isLoading || !isEditMode">
+          <div>
+            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo</label>
+            <input type="text" id="name" formControlName="name"
+                   class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                   [ngClass]="{'border-red-500 dark:border-kwd-red': userForm.get('name')?.invalid && userForm.get('name')?.touched}">
+            <div *ngIf="userForm.get('name')?.invalid && userForm.get('name')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+              <small *ngIf="userForm.get('name')?.errors?.['required']">El nombre es requerido.</small>
+              <small *ngIf="userForm.get('name')?.errors?.['minlength']">Debe tener al menos 3 caracteres.</small>
+            </div>
+          </div>
+
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Correo Electrónico</label>
+            <input type="email" id="email" formControlName="email"
+                   class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                   [ngClass]="{'border-red-500 dark:border-kwd-red': userForm.get('email')?.invalid && userForm.get('email')?.touched}">
+            <div *ngIf="userForm.get('email')?.invalid && userForm.get('email')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+              <small *ngIf="userForm.get('email')?.errors?.['required']">El correo es requerido.</small>
+              <small *ngIf="userForm.get('email')?.errors?.['email']">Formato de correo inválido.</small>
+            </div>
+          </div>
+
+          <div>
+            <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rol</label>
+            <select id="role" formControlName="role" required
+                    class="block w-full py-2 pl-3 pr-10 mt-1 text-base text-gray-900 border-gray-300 rounded-md dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                    [ngClass]="{'border-red-500 dark:border-kwd-red': userForm.get('role')?.invalid && userForm.get('role')?.touched}">
+              <option *ngFor="let roleItem of rolesForSelect" [ngValue]="roleItem.value">
+                {{ roleItem.key | titlecase }}
+              </option>
+            </select>
+            <div *ngIf="userForm.get('role')?.invalid && userForm.get('role')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+              <small *ngIf="userForm.get('role')?.errors?.['required']">El rol es requerido.</small>
+            </div>
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contraseña {{ isEditMode ? '(Dejar en blanco para no cambiar)' : '' }}</label>
+            <input type="password" id="password" formControlName="password"
+                   class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                   [ngClass]="{'border-red-500 dark:border-kwd-red': userForm.get('password')?.invalid && userForm.get('password')?.touched}">
+            <div *ngIf="userForm.get('password')?.invalid && userForm.get('password')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+              <small *ngIf="userForm.get('password')?.errors?.['required']">La contraseña es requerida.</small>
+              <small *ngIf="userForm.get('password')?.errors?.['minlength']">Debe tener al menos 6 caracteres.</small>
+            </div>
+          </div>
+
+          <div>
+            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirmar Contraseña</label>
+            <input type="password" id="confirmPassword" formControlName="confirmPassword"
+                   class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
+                   [ngClass]="{'border-red-500 dark:border-kwd-red': userForm.get('confirmPassword')?.invalid && userForm.get('confirmPassword')?.touched || userForm.errors?.['passwordMismatchGlobal'] && userForm.get('confirmPassword')?.touched}">
+            <div *ngIf="userForm.get('confirmPassword')?.invalid && userForm.get('confirmPassword')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+              <small *ngIf="userForm.get('confirmPassword')?.errors?.['required']">Confirmar la contraseña es requerido.</small>
+              <small *ngIf="userForm.get('confirmPassword')?.errors?.['passwordMismatch']">Las contraseñas no coinciden.</small>
+            </div>
+             <div *ngIf="userForm.hasError('passwordMismatchGlobal') && userForm.get('confirmPassword')?.touched && userForm.get('password')?.touched && !userForm.get('confirmPassword')?.hasError('passwordMismatch')" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
+                <small>Las contraseñas no coinciden.</small>
+            </div>
+          </div>
+
+          <div class="flex flex-col pt-4 space-y-3 sm:space-y-0 sm:flex-row sm:justify-end sm:space-x-3">
+            <button type="button" (click)="cancel()"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm dark:bg-kwd-darker dark:text-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-kwd-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kwd-blue-500">
+              Cancelar
+            </button>
+            <button type="submit" [disabled]="userForm.invalid || isLoading"
+                    class="flex items-center justify-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-sm bg-kwd-blue-DEFAULT hover:bg-kwd-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kwd-blue-500 dark:bg-kwd-blue-600 dark:hover:bg-kwd-blue-700 disabled:opacity-50">
+              <ion-spinner *ngIf="isLoading" name="dots" class="w-5 h-5 mr-3 -ml-1 text-white"></ion-spinner>
+              {{ isEditMode ? 'Actualizar' : 'Crear' }} Usuario
+            </button>
+          </div>
+        </ng-container>
+      </form>
+    </div>
+  </div>
 </ion-content>

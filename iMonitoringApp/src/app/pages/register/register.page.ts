@@ -1,4 +1,4 @@
-
+// src/app/pages/register/register.page.ts
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidatorFn } from '@angular/forms';
@@ -7,12 +7,11 @@ import {
   IonicModule,
   AlertController, LoadingController, NavController, ToastController
 } from '@ionic/angular';
-
 import { AuthService } from '../../services/auth.service';
-import { Rol } from '../../models/rol.model';
+import { Rol } from '../../models/rol.model'; // Asegúrate que la ruta sea correcta
 import { RegisterRequest } from '../../models/auth.model';
 
-
+// Validador personalizado para comparar contraseñas
 export function passwordMatchValidator(): ValidatorFn {
   return (control: AbstractControl): { [key: string]: any } | null => {
     const password = control.get('password');
@@ -33,14 +32,13 @@ export function passwordMatchValidator(): ValidatorFn {
   };
 }
 
-
 @Component({
   selector: 'app-register',
   templateUrl: './register.page.html',
   styleUrls: ['./register.page.scss'],
   standalone: true,
   imports: [
-    IonicModule, 
+    IonicModule,
     CommonModule,
     ReactiveFormsModule,
     RouterModule
@@ -48,14 +46,17 @@ export function passwordMatchValidator(): ValidatorFn {
 })
 export class RegisterPage implements OnInit {
   registerForm!: FormGroup;
-
   errorMessage: string = '';
   isLoading: boolean = false;
+
+  // Para el selector de roles
+  public rolesForSelect: { key: string, value: Rol }[] = [];
+  public RolEnum = Rol; // Para usar los valores del enum en el template
 
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
-    private router: Router,
+    private router: Router, // Aunque no se usa directamente si navCtrl maneja toda la navegación
     private alertCtrl: AlertController,
     private loadingCtrl: LoadingController,
     private navCtrl: NavController,
@@ -63,19 +64,26 @@ export class RegisterPage implements OnInit {
   ) {}
 
   ngOnInit() {
+    // Poblar rolesForSelect con todos los roles del enum Rol
+    this.rolesForSelect = Object.keys(Rol)
+      .filter(key => isNaN(Number(key))) // Obtiene solo las claves de string del enum
+      .map(key => ({ key: key.replace('_', ' '), value: Rol[key as keyof typeof Rol] })); // Reemplaza guiones bajos para display
+
     this.registerForm = this.fb.group({
+      name: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required],
-      
-      role: [Rol.ESTUDIANTE, [Validators.required]] 
+      role: [Rol.ESTUDIANTE, [Validators.required]] // Rol por defecto, pero el usuario podrá cambiarlo
     }, { validators: passwordMatchValidator() });
   }
 
+  // Getters para fácil acceso
+  get name() { return this.registerForm.get('name'); }
   get email() { return this.registerForm.get('email'); }
   get password() { return this.registerForm.get('password'); }
   get confirmPassword() { return this.registerForm.get('confirmPassword'); }
-
+  get role() { return this.registerForm.get('role'); }
 
   async onSubmit() {
     if (this.registerForm.invalid) {
@@ -89,21 +97,16 @@ export class RegisterPage implements OnInit {
     const loading = await this.loadingCtrl.create({ message: 'Registrando...' });
     await loading.present();
 
-    const formValues = this.registerForm.value;
-   
-    const registrationData: RegisterRequest = {
-      email: formValues.email,
-      password: formValues.password,
-      role: Rol.ESTUDIANTE 
-    };
 
-    console.log('Enviando datos de registro (solo Estudiante):', registrationData);
+    const registrationData: RegisterRequest = this.registerForm.value;
+
+    console.log('Enviando datos de registro (con rol seleccionado):', registrationData);
 
     this.authService.register(registrationData).subscribe({
       next: async (response) => {
         this.isLoading = false;
         await loading.dismiss();
-        await this.presentSuccessAlert();
+        await this.presentSuccessAlert(registrationData.role); 
       },
       error: async (err: Error) => {
         this.isLoading = false;
@@ -128,10 +131,11 @@ export class RegisterPage implements OnInit {
     await toast.present();
   }
 
-  async presentSuccessAlert() {
+  async presentSuccessAlert(registeredRole: Rol) {
+    const roleName = (Object.keys(Rol) as Array<keyof typeof Rol>).find(key => Rol[key] === registeredRole) || 'Usuario';
     const alert = await this.alertCtrl.create({
       header: 'Registro Exitoso',
-      message: 'Tu cuenta de estudiante ha sido creada. Ahora serás redirigido para iniciar sesión.',
+      message: `Tu cuenta de ${roleName.toLowerCase().replace('_', ' ')} ha sido creada. Ahora serás redirigido para iniciar sesión.`,
       buttons: [{
         text: 'OK',
         handler: () => {

@@ -7,8 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "users")
-@Data
+@Table(name = "users") 
+@Data 
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,6 +17,9 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @Column(nullable = true) 
+    private String name;
+
     @Column(nullable = false, unique = true)
     private String email;
 
@@ -24,5 +27,6 @@ public class User {
     private String password;
 
     @Enumerated(EnumType.STRING)
-    private Rol role;
+    @Column(nullable = false)
+    private Rol role; 
 }

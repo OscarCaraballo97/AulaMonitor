@@ -1,25 +1,24 @@
 package com.backend.IMonitoring.dto;
 
-
-import jakarta.validation.constraints.Pattern;
-import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
+import java.time.LocalDateTime;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class AvailabilityRequest {
-    @NotBlank(message = "El ID de la sala es obligatorio")
+
+    @NotBlank(message = "El ID del aula (classroomId) es obligatorio")
     private String classroomId;
 
-    @NotBlank(message = "La fecha es obligatoria (yyyy-MM-dd)")
-    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "Formato de fecha inválido. Use yyyy-MM-dd")
-    private String date;
+    @NotNull(message = "La fecha y hora de inicio son obligatorias")
+    private LocalDateTime startTime;
 
-    @NotBlank(message = "La hora de inicio es obligatoria (HH:mm)")
-    @Pattern(regexp = "^([01]?\\d|2[0-3]):[0-5]\\d$", message = "Formato de hora inválido. Use HH:mm (24h)")
-    private String startTime;
-
-    @NotBlank(message = "La hora de fin es obligatoria (HH:mm)")
-    @Pattern(regexp = "^([01]?\\d|2[0-3]):[0-5]\\d$", message = "Formato de hora inválido. Use HH:mm (24h)")
-    private String endTime;
+    @NotNull(message = "La fecha y hora de fin son obligatorias")
+    private LocalDateTime endTime;
 }
