@@ -22,13 +22,11 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     public AuthResponse register(RegisterRequest request) {
-        // --- CAMBIO AQUÍ: Comenta o elimina la validación de rol temporalmente ---
         /*
         if (request.getRole() != Rol.ESTUDIANTE) {
              throw new IllegalArgumentException("Solo el rol ESTUDIANTE es permitido para el registro público.");
         }
         */
-        // -------------------------------------------------------------------------
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("El correo electrónico ya está registrado.");

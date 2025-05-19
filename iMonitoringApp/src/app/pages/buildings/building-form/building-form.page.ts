@@ -1,14 +1,14 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { IonicModule, LoadingController, ToastController, NavController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { BuildingService } from '../../../services/building.service';
 import { Building } from '../../../models/building.model';
 import { AuthService } from '../../../services/auth.service';
 import { Rol } from '../../../models/rol.model';
-import { Observable, Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { Observable, Subject, forkJoin, of } from 'rxjs';
+import { takeUntil, finalize, catchError } from 'rxjs/operators'; 
 
 @Component({
   selector: 'app-building-form',
@@ -23,7 +23,8 @@ export class BuildingFormPage implements OnInit, OnDestroy {
   isEditMode = false;
   buildingId: string | null = null;
   pageTitle = 'Nuevo Edificio';
-  isLoading = false;
+  isLoading = false; 
+  isLoadingInitialData = true; 
   userRole: Rol | null = null;
 
   constructor(
@@ -31,43 +32,47 @@ export class BuildingFormPage implements OnInit, OnDestroy {
     private buildingService: BuildingService,
     private authService: AuthService,
     private route: ActivatedRoute,
-    private router: Router,
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController,
-    private navCtrl: NavController
+    private navCtrl: NavController,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
+    console.log("BuildingFormPage: ngOnInit INICIADO");
+    this.isLoadingInitialData = true;
+    this.cdr.detectChanges();
+
     this.buildingForm = this.fb.group({
-      name: ['', [Validators.required, Validators.minLength(3)]],
-      location: ['', [Validators.required, Validators.minLength(5)]],
+      name: ['', [Validators.required, Validators.minLength(2)]],
+      location: ['', [Validators.required, Validators.minLength(3)]],
     });
 
     this.authService.getCurrentUserRole()
       .pipe(takeUntil(this.destroy$))
       .subscribe((role: Rol | null) => {
         this.userRole = role;
-        if (!this.canManage() && (this.isEditMode || (this.router && this.router.url.includes('/new')))) {
-          this.presentToast('Acceso denegado. No tienes permiso para esta acción.', 'danger', 'lock-closed-outline');
-          this.navCtrl.navigateBack('/app/buildings');
-        }
-      });
+        console.log("BuildingFormPage: Rol recibido ->", this.userRole);
 
-    this.buildingId = this.route.snapshot.paramMap.get('id');
-    if (this.buildingId) {
-      this.isEditMode = true;
-      this.pageTitle = 'Editar Edificio';
-      if (this.userRole === null) {
-      } else if (this.canManage()) {
-        this.loadBuildingData(this.buildingId);
-      }
-    } else {
-      this.pageTitle = 'Nuevo Edificio';
-      if (this.userRole !== null && !this.canManage()) {
-        this.presentToast('Acceso denegado. No tienes permiso para esta acción.', 'danger', 'lock-closed-outline');
-        this.navCtrl.navigateBack('/app/buildings');
-      }
-    }
+        if (!this.canManageBuildings()) {
+          this.presentToast('Acceso denegado. No tienes permiso para gestionar edificios.', 'danger', 'lock-closed-outline');
+          this.navCtrl.navigateBack('/app/dashboard', { animationDirection: 'back' });
+          this.isLoadingInitialData = false; 
+          this.cdr.detectChanges();
+          return;
+        }
+
+        this.buildingId = this.route.snapshot.paramMap.get('id');
+        if (this.buildingId) {
+          this.isEditMode = true;
+          this.pageTitle = 'Editar Edificio';
+          this.loadBuildingData(this.buildingId);
+        } else {
+          this.pageTitle = 'Nuevo Edificio';
+          this.isLoadingInitialData = false;
+        }
+        this.cdr.detectChanges();
+      });
   }
 
   ngOnDestroy() {
@@ -75,27 +80,32 @@ export class BuildingFormPage implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  canManage(): boolean {
-    if (this.userRole === null) return false;
-    return this.userRole === Rol.ADMIN || this.userRole === Rol.PROFESOR;
+  canManageBuildings(): boolean {
+    if (!this.userRole) return false;
+    return this.userRole === Rol.ADMIN;
   }
 
   async loadBuildingData(id: string) {
     this.isLoading = true;
+    this.cdr.detectChanges();
     const loading = await this.loadingCtrl.create({ message: 'Cargando datos del edificio...' });
     await loading.present();
 
     this.buildingService.getBuildingById(id)
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(async () => {
+          this.isLoading = false;
+          this.isLoadingInitialData = false;
+          try { await loading.dismiss(); } catch(e) { console.warn("Error al descartar loading en loadBuildingData", e); }
+          this.cdr.detectChanges();
+        })
+      )
       .subscribe({
         next: (building: Building) => {
           this.buildingForm.patchValue(building);
-          this.isLoading = false;
-          loading.dismiss();
         },
         error: async (err: Error) => {
-          this.isLoading = false;
-          await loading.dismiss();
           await this.presentToast(err.message || 'Error al cargar datos del edificio.', 'danger', 'warning-outline');
           this.navCtrl.navigateBack('/app/buildings');
         }
@@ -108,12 +118,13 @@ export class BuildingFormPage implements OnInit, OnDestroy {
       await this.presentToast('Por favor, completa todos los campos requeridos.', 'warning', 'alert-circle-outline');
       return;
     }
-    if (!this.canManage()) {
+    if (!this.canManageBuildings()) {
       await this.presentToast('Acción no permitida.', 'danger', 'lock-closed-outline');
       return;
     }
 
-    this.isLoading = true;
+    this.isLoading = true; 
+    this.cdr.detectChanges();
     const loading = await this.loadingCtrl.create({ message: this.isEditMode ? 'Actualizando edificio...' : 'Creando edificio...' });
     await loading.present();
 
@@ -126,20 +137,22 @@ export class BuildingFormPage implements OnInit, OnDestroy {
       operation = this.buildingService.createBuilding(buildingData);
     }
 
-    operation.pipe(takeUntil(this.destroy$)).subscribe({
-      next: async (response?: Building | void) => {
+    operation.pipe(
+      takeUntil(this.destroy$),
+      finalize(async () => { 
+        this.isLoading = false;
+        try { await loading.dismiss(); } catch(e) { console.warn("Error al descartar loading en onSubmit finalize:", e); }
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: async () => { 
         const successMsg = `Edificio ${this.isEditMode ? 'actualizado' : 'creado'} correctamente.`;
-        this.isLoading = false; 
-        await loading.dismiss(); 
         await this.presentToast(successMsg, 'success', 'checkmark-circle-outline');
         this.navCtrl.navigateBack('/app/buildings', { animated: true });
       },
       error: async (err: Error) => {
-        this.isLoading = false; 
-        await loading.dismiss(); 
         await this.presentToast(err.message || 'Error al guardar el edificio.', 'danger', 'warning-outline');
       },
-
     });
   }
 

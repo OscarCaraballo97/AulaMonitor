@@ -1,4 +1,3 @@
-// src/app/pages/register/register.page.ts
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidatorFn } from '@angular/forms';
@@ -8,10 +7,10 @@ import {
   AlertController, LoadingController, NavController, ToastController
 } from '@ionic/angular';
 import { AuthService } from '../../services/auth.service';
-import { Rol } from '../../models/rol.model'; // Asegúrate que la ruta sea correcta
+import { Rol } from '../../models/rol.model'; 
 import { RegisterRequest } from '../../models/auth.model';
 
-// Validador personalizado para comparar contraseñas
+
 export function passwordMatchValidator(): ValidatorFn {
   return (control: AbstractControl): { [key: string]: any } | null => {
     const password = control.get('password');
@@ -49,14 +48,13 @@ export class RegisterPage implements OnInit {
   errorMessage: string = '';
   isLoading: boolean = false;
 
-  // Para el selector de roles
   public rolesForSelect: { key: string, value: Rol }[] = [];
-  public RolEnum = Rol; // Para usar los valores del enum en el template
+  public RolEnum = Rol;
 
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
-    private router: Router, // Aunque no se usa directamente si navCtrl maneja toda la navegación
+    private router: Router, 
     private alertCtrl: AlertController,
     private loadingCtrl: LoadingController,
     private navCtrl: NavController,
@@ -64,21 +62,21 @@ export class RegisterPage implements OnInit {
   ) {}
 
   ngOnInit() {
-    // Poblar rolesForSelect con todos los roles del enum Rol
+
     this.rolesForSelect = Object.keys(Rol)
-      .filter(key => isNaN(Number(key))) // Obtiene solo las claves de string del enum
-      .map(key => ({ key: key.replace('_', ' '), value: Rol[key as keyof typeof Rol] })); // Reemplaza guiones bajos para display
+      .filter(key => isNaN(Number(key)))
+      .map(key => ({ key: key.replace('_', ' '), value: Rol[key as keyof typeof Rol] }));
 
     this.registerForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(3)]],
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', Validators.required],
-      role: [Rol.ESTUDIANTE, [Validators.required]] // Rol por defecto, pero el usuario podrá cambiarlo
+      role: [Rol.ESTUDIANTE, [Validators.required]] 
     }, { validators: passwordMatchValidator() });
   }
 
-  // Getters para fácil acceso
+
   get name() { return this.registerForm.get('name'); }
   get email() { return this.registerForm.get('email'); }
   get password() { return this.registerForm.get('password'); }

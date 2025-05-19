@@ -3,7 +3,7 @@ package com.backend.IMonitoring.service;
 import com.backend.IMonitoring.model.User;
 import com.backend.IMonitoring.model.Rol;
 import com.backend.IMonitoring.repository.UserRepository;
-import com.backend.IMonitoring.repository.ReservationRepository;
+import com.backend.IMonitoring.repository.ReservationRepository; 
 import com.backend.IMonitoring.model.Reservation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,7 +18,7 @@ import java.util.Optional;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final ReservationRepository reservationRepository;
+    private final ReservationRepository reservationRepository; 
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -39,11 +39,9 @@ public class UserService {
 
     @Transactional
     public User createUser(User user) {
-        
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) { 
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             throw new IllegalArgumentException("El correo electrónico '" + user.getEmail() + "' ya está registrado.");
         }
-        
         if (user.getPassword() != null && !user.getPassword().startsWith("$2a$")) {
              user.setPassword(passwordEncoder.encode(user.getPassword()));
         }
@@ -53,8 +51,6 @@ public class UserService {
     @Transactional
     public User updateUser(String id, User userDetails) {
         User user = getUserById(id);
-
-       
         if (userDetails.getEmail() != null && !user.getEmail().equals(userDetails.getEmail())) {
             Optional<User> existingUserWithNewEmail = userRepository.findByEmail(userDetails.getEmail());
             if (existingUserWithNewEmail.isPresent() && !existingUserWithNewEmail.get().getId().equals(user.getId())) {
@@ -62,18 +58,14 @@ public class UserService {
             }
             user.setEmail(userDetails.getEmail());
         }
-
         if (userDetails.getName() != null) {
             user.setName(userDetails.getName());
         }
         if (userDetails.getRole() != null) {
             user.setRole(userDetails.getRole());
         }
-        
-
         if (userDetails.getPassword() != null && !userDetails.getPassword().isEmpty()) {
-
-            if (!userDetails.getPassword().startsWith("$2a$")) { 
+            if (!userDetails.getPassword().startsWith("$2a$")) {
                 user.setPassword(passwordEncoder.encode(userDetails.getPassword()));
             } else {
                 user.setPassword(userDetails.getPassword());
@@ -82,16 +74,18 @@ public class UserService {
         return userRepository.save(user);
     }
 
-
     @Transactional
     public void deleteUser(String id) {
-        
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("Usuario no encontrado con ID: " + id + " para eliminar.");
-        }
-        userRepository.deleteById(id);
-    }
+        User userToDelete = getUserById(id);
 
+        List<Reservation> userReservations = reservationRepository.findByUserId(id);
+        if (userReservations != null && !userReservations.isEmpty()) {
+            reservationRepository.deleteAll(userReservations);
+
+        }
+
+        userRepository.delete(userToDelete);
+    }
 
     public List<Reservation> getUserReservations(String userId) {
         return reservationRepository.findByUserId(userId);

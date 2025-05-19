@@ -1,7 +1,6 @@
 package com.backend.IMonitoring.service;
-
-import com.backend.IMonitoring.model.User; // Importa tu entidad User
-import com.backend.IMonitoring.security.UserDetailsImpl; // Tu implementación de UserDetails
+import com.backend.IMonitoring.model.User;
+import com.backend.IMonitoring.security.UserDetailsImpl;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -31,7 +30,6 @@ public class JwtService {
     private long jwtExpiration;
 
     public String extractUsername(String token) {
-        // ... (como lo tenías)
         try {
             return extractClaim(token, Claims::getSubject);
         } catch (ExpiredJwtException | SignatureException e) {
@@ -65,24 +63,21 @@ public class JwtService {
             extraClaims.put("role", primaryRole);
         }
 
-        // --- AÑADIR ID DEL USUARIO Y NOMBRE AL TOKEN ---
         if (userDetails instanceof UserDetailsImpl) {
             UserDetailsImpl userDetailsImplCasted = (UserDetailsImpl) userDetails;
-            User appUser = userDetailsImplCasted.getUserEntity(); // Asume que este método existe
+            User appUser = userDetailsImplCasted.getUserEntity();
             if (appUser != null) {
-                extraClaims.put("userId", appUser.getId()); // <--- AÑADE EL ID DEL USUARIO
+                extraClaims.put("userId", appUser.getId());
                 if (appUser.getName() != null) {
                     extraClaims.put("name", appUser.getName());
                 }
             }
         }
-        // ------------------------------------------
 
         return generateToken(extraClaims, userDetails);
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
-        // ... (como lo tenías)
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(userDetails.getUsername())
@@ -93,7 +88,7 @@ public class JwtService {
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        // ... (como lo tenías)
+
          try {
             final String username = extractUsername(token);
             return (username != null && username.equals(userDetails.getUsername())) && !isTokenExpired(token);
@@ -104,7 +99,7 @@ public class JwtService {
     }
 
     private boolean isTokenExpired(String token) {
-        // ... (como lo tenías)
+
         try {
             return extractExpiration(token).before(new Date());
         } catch (ExpiredJwtException e) {
@@ -119,7 +114,7 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
-        // ... (como lo tenías)
+
         return Jwts.parser()
                 .verifyWith(getSignInKey())
                 .build()
@@ -128,7 +123,6 @@ public class JwtService {
     }
 
     private SecretKey getSignInKey() {
-        // ... (como lo tenías, asegurándote que base64EncodedSecretKey sea válida y larga)
         byte[] keyBytes;
         try {
             keyBytes = Decoders.BASE64.decode(this.base64EncodedSecretKey);

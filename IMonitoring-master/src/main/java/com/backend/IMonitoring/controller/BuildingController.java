@@ -1,10 +1,12 @@
 package com.backend.IMonitoring.controller;
 
+import com.backend.IMonitoring.dto.BuildingRequestDTO;
 import com.backend.IMonitoring.model.Building;
-import com.backend.IMonitoring.model.Classroom;
 import com.backend.IMonitoring.service.BuildingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -15,6 +17,7 @@ import java.util.List;
 @RequestMapping("/api/buildings")
 @RequiredArgsConstructor
 public class BuildingController {
+
     private final BuildingService buildingService;
 
     @GetMapping
@@ -28,8 +31,9 @@ public class BuildingController {
     }
 
     @PostMapping
-    public ResponseEntity<Building> createBuilding(@RequestBody Building building) {
-        Building createdBuilding = buildingService.createBuilding(building);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Building> createBuilding(@Valid @RequestBody BuildingRequestDTO buildingRequestDTO) {
+        Building createdBuilding = buildingService.createBuilding(buildingRequestDTO);
         URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
@@ -39,18 +43,16 @@ public class BuildingController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Building> updateBuilding(@PathVariable String id, @RequestBody Building building) {
-        return ResponseEntity.ok(buildingService.updateBuilding(id, building));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Building> updateBuilding(@PathVariable String id, @Valid @RequestBody BuildingRequestDTO buildingRequestDTO) {
+        Building updatedBuilding = buildingService.updateBuilding(id, buildingRequestDTO);
+        return ResponseEntity.ok(updatedBuilding);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteBuilding(@PathVariable String id) {
         buildingService.deleteBuilding(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{id}/classrooms")
-    public ResponseEntity<List<Classroom>> getClassroomsByBuilding(@PathVariable String id) {
-        return ResponseEntity.ok(buildingService.getClassroomsByBuilding(id));
     }
 }

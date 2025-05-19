@@ -4,5 +4,5 @@ public enum ReservationStatus {
     CONFIRMADA,
     PENDIENTE,
     RECHAZADA,
-    CANCELADA 
+    CANCELADA
 }

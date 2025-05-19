@@ -1,100 +1,72 @@
 <ion-header class="md:hidden">
-  <ion-toolbar color="primary" class="dark:bg-kwd-darker">
+  <ion-toolbar color="primary">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/app/classrooms"></ion-back-button>
     </ion-buttons>
-    <ion-title class="dark:text-kwd-light">{{ pageTitle }}</ion-title>
+    <ion-title>{{ pageTitle }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="bg-gray-100 dark:bg-kwd-dark">
+<ion-header class="hidden md:block sticky top-0 z-10">
+  <ion-toolbar color="light">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/app/classrooms"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ pageTitle }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
   <div class="p-4 md:p-6 lg:p-8">
     <div class="max-w-2xl mx-auto">
-      <div class="mb-6">
-        <h1 class="text-2xl font-semibold text-gray-800 dark:text-kwd-light">{{ pageTitle }}</h1>
-        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          {{ isEditMode ? 'Actualiza los detalles del aula.' : 'Completa la información para crear una nueva aula.' }}
-        </p>
+
+      <div *ngIf="isLoadingInitialData" class="text-center py-20">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p class="mt-4">Cargando formulario...</p>
       </div>
 
-      <form [formGroup]="classroomForm" (ngSubmit)="onSubmit()"
-            class="p-6 space-y-6 bg-white rounded-lg shadow dark:bg-kwd-darker">
+      <form [formGroup]="classroomForm" (ngSubmit)="onSubmit()" *ngIf="!isLoadingInitialData && classroomForm"
+            class="space-y-6 bg-white p-6 rounded-lg shadow dark:bg-kwd-darker">
 
-        <div *ngIf="isLoading && isEditMode" class="py-8 text-center">
-          <ion-spinner name="crescent"></ion-spinner>
-          <p class="mt-2 text-gray-500 dark:text-gray-400">Cargando datos del aula...</p>
+        <ion-item>
+          <ion-label position="stacked">Nombre del Aula <span class="text-red-500">*</span></ion-label>
+          <ion-input formControlName="name" type="text" placeholder="Ej: Salón 101, Laboratorio B"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="stacked">Capacidad <span class="text-red-500">*</span></ion-label>
+          <ion-input formControlName="capacity" type="number" placeholder="Ej: 30"></ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="stacked">Tipo de Aula <span class="text-red-500">*</span></ion-label>
+          <ion-select formControlName="type" interface="popover">
+            <ion-select-option *ngFor="let typeEntry of ClassroomTypeEnum | keyvalue" [value]="typeEntry.value">
+              {{ typeEntry.value | titlecase }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="stacked">Recursos</ion-label>
+          <ion-textarea formControlName="resources" auto-grow placeholder="Ej: Proyector, Aire acondicionado..."></ion-textarea>
+        </ion-item>
+
+        <ion-item>
+          <ion-label position="stacked">Edificio <span class="text-red-500">*</span></ion-label>
+          <ion-select formControlName="buildingId" interface="popover">
+            <ion-select-option *ngFor="let building of buildings" [value]="building.id">
+              {{ building.name }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <div class="flex justify-between">
+          <ion-button expand="block" type="submit" [disabled]="isLoading || classroomForm.invalid" color="primary">
+            {{ isEditMode ? 'Actualizar' : 'Crear' }}
+          </ion-button>
+          <ion-button expand="block" fill="clear" color="medium" (click)="cancel()">Cancelar</ion-button>
         </div>
-
-        <ng-container *ngIf="!isLoading || !isEditMode">
-          <div>
-            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del Aula</label>
-            <input type="text" id="name" formControlName="name" placeholder="Ej: Aula 101, Laboratorio de Física"
-                   class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
-                   [ngClass]="{'border-red-500 dark:border-kwd-red': classroomForm.get('name')?.invalid && classroomForm.get('name')?.touched}">
-            <div *ngIf="classroomForm.get('name')?.invalid && classroomForm.get('name')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
-              <small *ngIf="classroomForm.get('name')?.errors?.['required']">El nombre es requerido.</small>
-              <small *ngIf="classroomForm.get('name')?.errors?.['minlength']">Debe tener al menos 2 caracteres.</small>
-            </div>
-          </div>
-
-          <div>
-            <label for="buildingId" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Edificio</label>
-            <select id="buildingId" formControlName="buildingId" required
-                    class="block w-full py-2 pl-3 pr-10 mt-1 text-base text-gray-900 border-gray-300 rounded-md dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
-                    [ngClass]="{'border-red-500 dark:border-kwd-red': classroomForm.get('buildingId')?.invalid && classroomForm.get('buildingId')?.touched}">
-              <option [ngValue]="null" disabled>Selecciona un edificio</option>
-              <option *ngFor="let building of buildings" [value]="building.id">{{ building.name }}</option>
-            </select>
-            <div *ngIf="classroomForm.get('buildingId')?.invalid && classroomForm.get('buildingId')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
-              <small *ngIf="classroomForm.get('buildingId')?.errors?.['required']">El edificio es requerido.</small>
-            </div>
-          </div>
-
-          <div>
-            <label for="capacity" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Capacidad</label>
-            <input type="number" id="capacity" formControlName="capacity" placeholder="Ej: 30"
-                   class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
-                   [ngClass]="{'border-red-500 dark:border-kwd-red': classroomForm.get('capacity')?.invalid && classroomForm.get('capacity')?.touched}">
-            <div *ngIf="classroomForm.get('capacity')?.invalid && classroomForm.get('capacity')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
-              <small *ngIf="classroomForm.get('capacity')?.errors?.['required']">La capacidad es requerida.</small>
-              <small *ngIf="classroomForm.get('capacity')?.errors?.['min']">La capacidad debe ser al menos 1.</small>
-              <small *ngIf="classroomForm.get('capacity')?.errors?.['pattern']">Debe ser un número.</small>
-            </div>
-          </div>
-
-          <div>
-            <label for="type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Aula</label>
-            <select id="type" formControlName="type" required
-                    class="block w-full py-2 pl-3 pr-10 mt-1 text-base text-gray-900 border-gray-300 rounded-md dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"
-                    [ngClass]="{'border-red-500 dark:border-kwd-red': classroomForm.get('type')?.invalid && classroomForm.get('type')?.touched}">
-              <option [ngValue]="null" disabled>Selecciona un tipo</option>
-              <option *ngFor="let typeKey of classroomTypes" [ngValue]="typeKey">
-                {{ typeKey.replace('_', ' ') | titlecase }}
-              </option>
-            </select>
-            <div *ngIf="classroomForm.get('type')?.invalid && classroomForm.get('type')?.touched" class="mt-1 text-xs text-red-600 dark:text-kwd-red">
-              <small *ngIf="classroomForm.get('type')?.errors?.['required']">El tipo es requerido.</small>
-            </div>
-          </div>
-
-          <div>
-            <label for="resources" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Recursos (separados por coma)</label>
-            <textarea id="resources" formControlName="resources" rows="3" placeholder="Ej: Proyector, Pizarra, Aire Acondicionado"
-                      class="block w-full px-3 py-2 mt-1 text-gray-900 border border-gray-300 rounded-md shadow-sm dark:bg-kwd-dark dark:border-gray-600 dark:text-kwd-light focus:outline-none focus:ring-kwd-blue-DEFAULT focus:border-kwd-blue-DEFAULT sm:text-sm"></textarea>
-          </div>
-
-          <div class="flex flex-col pt-4 space-y-3 sm:space-y-0 sm:flex-row sm:justify-end sm:space-x-3">
-            <button type="button" (click)="cancel()"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm dark:bg-kwd-darker dark:text-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-kwd-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kwd-blue-500">
-              Cancelar
-            </button>
-            <button type="submit" [disabled]="classroomForm.invalid || isLoading"
-                    class="flex items-center justify-center px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md shadow-sm bg-kwd-blue-DEFAULT hover:bg-kwd-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-kwd-blue-500 dark:bg-kwd-blue-600 dark:hover:bg-kwd-blue-700 disabled:opacity-50">
-              <ion-spinner *ngIf="isLoading" name="dots" class="w-5 h-5 mr-3 -ml-1 text-white"></ion-spinner>
-              {{ isEditMode ? 'Actualizar' : 'Guardar' }} Aula
-            </button>
-          </div>
-        </ng-container>
       </form>
     </div>
   </div>

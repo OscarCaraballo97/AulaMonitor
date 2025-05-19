@@ -1,17 +1,24 @@
-
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { Classroom } from '../models/classroom.model'; 
-import { ClassroomType } from '../models/classroom-type.enum'; 
+import { Classroom } from '../models/classroom.model';
+import { ClassroomType } from '../models/classroom-type.enum';
 import { Reservation } from '../models/reservation.model';
 
-export interface ClassroomAvailabilitySummary {
+export interface ClassroomAvailabilitySummaryDTO {
   availableNow: number;
   occupiedNow: number;
   total: number;
+}
+
+export interface ClassroomRequestData {
+  name: string;
+  capacity: number;
+  type: ClassroomType;
+  resources?: string;
+  buildingId: string;
 }
 
 @Injectable({
@@ -27,9 +34,13 @@ export class ClassroomService {
     if (error.error instanceof ErrorEvent) {
       errorMessage += `Error: ${error.error.message}`;
     } else {
-      errorMessage += `Código ${error.status}, mensaje: ${error.error?.message || error.message || 'Error del servidor'}`;
+      const serverErrorMessage = error.error?.message || error.error?.error || error.message;
+      errorMessage += `Código ${error.status}, mensaje: ${serverErrorMessage || 'Error del servidor desconocido'}`;
+      if (error.status === 0) {
+        errorMessage = `No se pudo conectar con el servidor para ${operation}. Verifica la conexión o el estado del servidor.`;
+      }
     }
-    console.error(errorMessage, error);
+    console.error(`[ClassroomService] ${errorMessage}`, error);
     return throwError(() => new Error(errorMessage));
   }
 
@@ -43,13 +54,13 @@ export class ClassroomService {
       .pipe(catchError(err => this.handleError(err, `obtener aula por ID ${id}`)));
   }
 
-  createClassroom(classroom: Classroom): Observable<Classroom> {
-    return this.http.post<Classroom>(this.apiUrl, classroom)
+  createClassroom(classroomData: ClassroomRequestData): Observable<Classroom> {
+    return this.http.post<Classroom>(this.apiUrl, classroomData)
       .pipe(catchError(err => this.handleError(err, 'crear aula')));
   }
 
-  updateClassroom(id: string, classroom: Classroom): Observable<Classroom> {
-    return this.http.put<Classroom>(`${this.apiUrl}/${id}`, classroom)
+  updateClassroom(id: string, classroomData: Partial<ClassroomRequestData>): Observable<Classroom> {
+    return this.http.put<Classroom>(`${this.apiUrl}/${id}`, classroomData)
       .pipe(catchError(err => this.handleError(err, `actualizar aula ${id}`)));
   }
 
@@ -58,29 +69,37 @@ export class ClassroomService {
       .pipe(catchError(err => this.handleError(err, `eliminar aula ${id}`)));
   }
 
-  getAvailabilitySummary(): Observable<ClassroomAvailabilitySummary> {
-    return this.http.get<ClassroomAvailabilitySummary>(`${this.apiUrl}/stats/availability`)
-      .pipe(catchError(err => this.handleError(err, 'obtener resumen de disponibilidad')));
-  }
-
-  getClassroomsByBuildingId(buildingId: string): Observable<Classroom[]> {
-    const params = new HttpParams().set('buildingId', buildingId);
-    return this.http.get<Classroom[]>(this.apiUrl, { params })
-        .pipe(catchError(err => this.handleError(err, `obtener aulas para edificio ${buildingId}`)));
+  getClassroomReservations(classroomId: string, startDateISO: string, endDateISO: string): Observable<Reservation[]> {
+    let params = new HttpParams()
+      .set('startDate', startDateISO)
+      .set('endDate', endDateISO);
+    return this.http.get<Reservation[]>(`${this.apiUrl}/${classroomId}/reservations-by-date`, { params })
+      .pipe(catchError(err => this.handleError(err, `obtener reservas para aula ${classroomId} en rango de fechas`)));
   }
   
+  getAvailabilitySummary(): Observable<ClassroomAvailabilitySummaryDTO> {
+    return this.http.get<ClassroomAvailabilitySummaryDTO>(`${this.apiUrl}/stats/availability`)
+      .pipe(catchError(err => this.handleError(err, 'obtener resumen de disponibilidad de aulas')));
+  }
 
-  getClassroomsByType(type: ClassroomType): Observable<Classroom[]> {
+  checkClassroomAvailability(classroomId: string, startTimeISO: string, endTimeISO: string): Observable<boolean> {
+    const params = new HttpParams()
+      .set('startTime', startTimeISO)
+      .set('endTime', endTimeISO);
+    return this.http.get<{isAvailable: boolean}>(`${this.apiUrl}/${classroomId}/check-availability`, { params })
+      .pipe(
+        map((response: {isAvailable: boolean}) => response.isAvailable),
+        catchError(err => this.handleError(err, `verificar disponibilidad para aula ${classroomId} en rango`))
+      );
+  }
+
+   getClassroomsByType(type: ClassroomType): Observable<Classroom[]> {
     return this.http.get<Classroom[]>(`${this.apiUrl}/type/${type}`)
       .pipe(catchError(err => this.handleError(err, `obtener aulas por tipo ${type}`)));
   }
-  getClassroomReservations(classroomId: string, start: string, end: string): Observable<Reservation[]> {
-    const params = new HttpParams()
-      .set('start', start)
-      .set('end', end)
-      .set('status', 'CONFIRMADA'); 
 
-    return this.http.get<Reservation[]>(`${this.apiUrl}/${classroomId}/reservations`, { params })
-      .pipe(catchError(err => this.handleError(err, `obtener reservas para aula ${classroomId}`)));
+  getClassroomsByMinCapacity(minCapacity: number): Observable<Classroom[]> {
+    return this.http.get<Classroom[]>(`${this.apiUrl}/capacity/${minCapacity}`)
+      .pipe(catchError(err => this.handleError(err, `obtener aulas por capacidad mínima ${minCapacity}`)));
   }
 }

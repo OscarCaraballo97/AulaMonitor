@@ -1,10 +1,12 @@
 package com.backend.IMonitoring.model;
-
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -17,18 +19,24 @@ import java.time.LocalDateTime;
 public class Reservation {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id; 
+    private String id;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "classroom_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonBackReference("classroom-reservations")
     private Classroom classroom;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user; 
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonBackReference("user-reservations")
+    private User user;
 
     @Column(nullable = false)
-    private LocalDateTime startTime; 
+    private LocalDateTime startTime;
 
     @Column(nullable = false)
     private LocalDateTime endTime;

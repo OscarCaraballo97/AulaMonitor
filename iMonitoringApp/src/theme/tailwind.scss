@@ -1,26 +1,13 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@use 'tailwindcss/base';
+@use 'tailwindcss/components';
+@use 'tailwindcss/utilities';
 
-// 2. (Recommended) Define global base styles using @layer base and @apply.
-// This is useful for styling the `body` or `html` elements with Tailwind utilities.
 @layer base {
   body {
-    // Apply the main font family defined in your tailwind.config.js (fontFamily.sans)
-    // and base text/background colors from Tailwind.
     @apply font-sans text-gray-900 bg-gray-100;
-    // Consider adding anti-aliasing for better font rendering:
-    // -webkit-font-smoothing: antialiased;
-    // -moz-osx-font-smoothing: grayscale;
   }
 
   body.dark {
-    // Apply base colors for dark mode.
-    // Ensure 'kwd-light' and 'kwd-dark' are defined in your
-    // tailwind.config.js under theme.extend.colors for @apply to work with them.
-    // If they are only CSS variables, use 'color: var(--kwd-light);' directly.
     @apply text-kwd-light bg-kwd-dark;
   }
-
-  // You can add more base styles here if needed.
 }

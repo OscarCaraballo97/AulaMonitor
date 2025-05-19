@@ -1,12 +1,11 @@
-// src/app/models/classroom.model.ts
 import { Building } from './building.model';
-import { ClassroomType } from './classroom-type.enum'; // <--- ASEGÚRATE QUE IMPORTA DESDE EL ARCHIVO CORRECTO
+import { ClassroomType } from './classroom-type.enum';
 
 export interface Classroom {
   id?: string;
   name: string;
   capacity: number;
-  type: ClassroomType; // Usa el enum importado
+  type: ClassroomType;
   resources?: string;
   buildingId: string;
   building?: Building;

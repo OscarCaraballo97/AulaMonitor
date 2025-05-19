@@ -1,4 +1,3 @@
-// src/app/services/auth.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Storage } from '@ionic/storage-angular';
@@ -33,7 +32,6 @@ export class AuthService {
   }
 
   private async initStorage() {
-    // ... (como lo tenías)
     try {
       this._storage = await this.storage.create();
       console.log('AuthService: Storage inicializado.');
@@ -43,7 +41,6 @@ export class AuthService {
   }
 
   async loadToken() {
-    // ... (como lo tenías)
     if (!this._storage) {
       await this.initStorage();
       if (!this._storage) {
@@ -74,17 +71,17 @@ export class AuthService {
 
     if (decodedPayload) {
       const role = this.parseRoleFromToken(decodedPayload);
-      const userEmail = decodedPayload.sub; // Subject (email)
-      const userName = decodedPayload.name || userEmail; // Nombre del claim 'name' o fallback a email
-      const userId = decodedPayload.userId || decodedPayload.id || decodedPayload.jti; // <--- EXTRAER userId o id o jti
+      const userEmail = decodedPayload.sub;
+      const userName = decodedPayload.name || userEmail; 
+      const userId = decodedPayload.userId || decodedPayload.id || decodedPayload.jti; 
 
       console.log('[AuthService - processToken] Rol parseado:', role, '| Email (sub):', userEmail, '| UserID Claim:', userId);
 
       this.currentUserRole.next(role);
       const userFromToken: User = {
-        id: userId, // <--- ASIGNAR EL ID EXTRAÍDO
+        id: userId, 
         email: userEmail || 'Error al decodificar email',
-        role: role || Rol.ESTUDIANTE, // Rol por defecto si no se puede parsear
+        role: role || Rol.ESTUDIANTE, 
         name: userName,
         avatarUrl: decodedPayload.avatarUrl || decodedPayload.picture || undefined,
       };
@@ -98,7 +95,6 @@ export class AuthService {
   }
 
   private decodeTokenPayload(token: string): any | null {
-    // ... (como lo tenías)
     try {
       const payloadBase64Url = token.split('.')[1];
       if (!payloadBase64Url) {
@@ -115,7 +111,6 @@ export class AuthService {
   }
 
   private parseRoleFromToken(decodedPayload: any): Rol | null {
-    // ... (como lo tenías)
     console.log("[AuthService - parseRoleFromToken] Intentando parsear rol desde payload:", decodedPayload);
     let roleString: string | undefined;
     if (decodedPayload.authorities && Array.isArray(decodedPayload.authorities) && decodedPayload.authorities.length > 0) {
@@ -136,7 +131,6 @@ export class AuthService {
   }
 
   register(data: RegisterRequest): Observable<AuthResponse> {
-    // ... (como lo tenías)
     console.log('[AuthService - register] Registrando con datos:', data);
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data).pipe(
       tap(async (res) => {
@@ -153,14 +147,13 @@ export class AuthService {
   }
 
   login(credentials: AuthRequest): Observable<AuthResponse> {
-    // ... (como lo tenías)
     console.log('[AuthService - login] Iniciando sesión con credenciales:', credentials);
     return this.http.post<AuthResponse>(`${this.apiUrl}/authenticate`, credentials).pipe(
       tap(async (res) => {
         console.log('[AuthService - login] Respuesta de autenticación backend:', res);
         if (res && res.token && this._storage) {
           await this._storage.set(TOKEN_KEY, res.token);
-          this.processToken(res.token); // Esto ahora debería setear el ID del usuario
+          this.processToken(res.token); 
         } else {
           console.warn('[AuthService - login] Respuesta de login no contiene token.');
           this.setUnauthenticatedState();
@@ -171,7 +164,6 @@ export class AuthService {
   }
 
   async logout() {
-    // ... (como lo tenías)
     console.log('[AuthService - logout] Ejecutando logout.');
     await this.clearAuthDataAndSetUnauthenticated();
     this.navCtrl.navigateRoot('/login', { animated: true, animationDirection: 'back' });
@@ -179,7 +171,6 @@ export class AuthService {
   }
 
   private async clearAuthDataAndSetUnauthenticated() {
-    // ... (como lo tenías)
     if (!this._storage) await this.initStorage();
     await this._storage?.remove(TOKEN_KEY);
     this.setUnauthenticatedState();
@@ -187,7 +178,6 @@ export class AuthService {
   }
 
   private setUnauthenticatedState() {
-    // ... (como lo tenías)
     this.isAuthenticated.next(false);
     this.currentUserRole.next(null);
     this.currentUser.next(null);
@@ -195,7 +185,6 @@ export class AuthService {
   }
 
   public updateCurrentUser(updatedUserData: Partial<User>) {
-    // ... (como lo tenías)
     const current = this.currentUser.value;
     if (current) {
         this.currentUser.next({ ...current, ...updatedUserData });
@@ -207,28 +196,24 @@ export class AuthService {
   getCurrentUserRole(): Observable<Rol | null> { return this.currentUserRole.asObservable(); }
   getCurrentUser(): Observable<User | null> { return this.currentUser.asObservable(); }
   async getToken(): Promise<string | null> {
-    // ... (como lo tenías)
     if (!this._storage) await this.initStorage();
     return this._storage ? this._storage.get(TOKEN_KEY) : null;
   }
 
   private handleAuthError = (error: HttpErrorResponse): Observable<never> => {
-    // ... (como lo tenías)
     console.error('[AuthService - handleAuthError] API Error:', error);
     let userMessage = 'Error de autenticación o conexión con el servidor.';
-    if (error.status === 0) { // net::ERR_CONNECTION_REFUSED u otros errores de red
+    if (error.status === 0) { 
         userMessage = 'No se pudo conectar con el servidor. Verifica tu conexión o que el servidor esté activo.';
-    } else if (error.status === 401) { // Unauthorized
+    } else if (error.status === 401) { 
         userMessage = 'Credenciales incorrectas. Por favor, verifica tu correo y contraseña.';
-    } else if (error.status === 403) { // Forbidden
+    } else if (error.status === 403) {
         userMessage = 'No tienes permiso para acceder a este recurso.';
-    } else if (error.error && typeof error.error.message === 'string') { // Mensaje de error específico del backend
+    } else if (error.error && typeof error.error.message === 'string') { 
         userMessage = error.error.message;
     } else if (typeof error.message === 'string' && error.status !== 0) {
         userMessage = error.message;
     }
-    // Para errores 500, el mensaje genérico "Error de autenticación o conexión con el servidor." podría ser suficiente,
-    // o podrías añadir un caso específico si el backend devuelve un JSON de error estándar.
     return throwError(() => new Error(userMessage));
   }
 }

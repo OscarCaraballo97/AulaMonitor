@@ -5,9 +5,10 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -19,16 +20,16 @@ import java.util.List;
 public class Building {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id; 
+    private String id;
 
-    @Column(nullable = false)
-    private String name; 
+    @Column(nullable = false, unique = true)
+    private String name;
 
-    @Column(nullable = false)
     private String location;
 
-    @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference
-    @Builder.Default
-    private List<Classroom> classrooms = new ArrayList<>();
+    @OneToMany(mappedBy = "building", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonManagedReference("building-classrooms")
+    private List<Classroom> classrooms;
 }

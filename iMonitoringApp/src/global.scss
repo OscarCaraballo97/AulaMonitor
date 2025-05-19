@@ -1,40 +1,19 @@
-@import "./theme/tailwind.scss";
+@use "./theme/tailwind.scss" as tailwind;
+@use "./theme/variables" as *;
 
-// 2. Import Ionic's core CSS files.
-// These are plain CSS, so @import is the correct directive.
+// Ionic CSS imports (se mantienen como @import porque son CSS plano)
 @import "@ionic/angular/css/core.css";
 @import "@ionic/angular/css/normalize.css";
-@import "@ionic/angular/css/structure.css"; // Consider commenting out if you heavily rely on Tailwind for layout
+@import "@ionic/angular/css/structure.css";
 @import "@ionic/angular/css/typography.css";
-@import '@ionic/angular/css/display.css'; // Ionic display utilities
-
-// 3. Import your theme variables (which define CSS custom properties for KWD and Ionic).
-// This comes after Ionic's core and Tailwind's base to allow your variables
-// to take precedence or build upon them.
-// Using @import here for _variables.scss is fine because it only contains CSS variable definitions.
-// If _variables.scss were to contain Sass variables, mixins, or functions you wanted to namespace,
-// then @use "./theme/variables" as *; (or with a namespace) would be more appropriate,
-// but it MUST come before any other @import of an .scss file or any other Sass rule.
-// Given the current content of _variables.scss (only CSS custom properties), @import is simpler.
-@import "./theme/variables"; // Sass can resolve _variables.scss without the underscore or extension
-
-// 4. Import Optional Ionic CSS utilities.
-// These might use Ionic's CSS variables, so they come after your variable definitions.
+@import '@ionic/angular/css/display.css';
 @import "@ionic/angular/css/padding.css";
 @import "@ionic/angular/css/float-elements.css";
 @import "@ionic/angular/css/text-alignment.css";
 @import "@ionic/angular/css/text-transformation.css";
 @import "@ionic/angular/css/flex-utils.css";
 
-// 5. Ionic Dark Mode Palette (Optional)
-// If your custom dark mode overrides in _variables.scss (body.dark {...}) are comprehensive
-// for the KWD look, you might not need this.
-// If some Ionic components don't theme well with only your variables,
-// uncommenting this (which respects system preference) might help.
-/* @import '@ionic/angular/css/palettes/dark.system.css'; */
-
-
-/* Your custom global styles (non-utility, non-variable) can go here */
+/* Estilos globales personalizados */
 .kwd-toast-success {
   --background: var(--ion-color-success, var(--kwd-color-green));
   --color: var(--ion-color-success-contrast, white);
@@ -45,5 +24,5 @@
 }
 .kwd-toast-warning {
   --background: var(--ion-color-warning, var(--kwd-color-yellow));
-  --color: var(--ion-color-warning-contrast, black); // Yellow sometimes needs dark text
+  --color: var(--ion-color-warning-contrast, black);
 }

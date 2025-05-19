@@ -19,32 +19,32 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-
 import java.util.List;
-
 
 @RestController
 @RequestMapping("/api/reservations")
 @RequiredArgsConstructor
 public class ReservationController {
     private final ReservationService reservationService;
-    private final ClassroomService classroomService;
-    private final UserService userService;
-
+    private final ClassroomService classroomService; 
+    private final UserService userService;  
 
     @GetMapping
     public ResponseEntity<List<Reservation>> getAllReservations(
             @RequestParam(required = false) String classroomId,
             @RequestParam(required = false) String userId,
-            @RequestParam(required = false) ReservationStatus status) {
-        if (classroomId != null) {
-            return ResponseEntity.ok(reservationService.getReservationsByClassroom(classroomId));
-        } else if (userId != null) {
-            return ResponseEntity.ok(reservationService.getReservationsByUser(userId));
-        } else if (status != null) {
-            return ResponseEntity.ok(reservationService.getReservationsByStatus(status));
+            @RequestParam(required = false) ReservationStatus status,
+            @AuthenticationPrincipal UserDetails currentUserDetails 
+    ) {
+        UserDetailsImpl userDetailsImpl = (UserDetailsImpl) currentUserDetails;
+        if (userDetailsImpl.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
+
+            return ResponseEntity.ok(reservationService.getAdminFilteredReservations(classroomId, userId, status));
+        } else {
+            
+            String currentAuthUserId = userDetailsImpl.getId();
+            return ResponseEntity.ok(reservationService.getFilteredUserReservations(currentAuthUserId, status, "asc", "startTime", 0, 100, false));
         }
-        return ResponseEntity.ok(reservationService.getAllReservations());
     }
 
     @GetMapping("/{id}")
@@ -52,34 +52,25 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.getReservationById(id));
     }
 
-
     @PostMapping
     public ResponseEntity<Reservation> createReservation(
             @Valid @RequestBody ReservationRequestDTO reservationRequestDTO,
             @AuthenticationPrincipal UserDetails currentUserDetails
     ) {
         if (currentUserDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); 
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         Classroom classroom = classroomService.getClassroomById(reservationRequestDTO.getClassroomId());
         User userToReserveFor;
 
-
-        if (currentUserDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")) &&
+        UserDetailsImpl userDetailsImpl = (UserDetailsImpl) currentUserDetails;
+        if (userDetailsImpl.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")) &&
             reservationRequestDTO.getUserId() != null &&
             !reservationRequestDTO.getUserId().isEmpty()) {
-
             userToReserveFor = userService.getUserById(reservationRequestDTO.getUserId());
         } else {
-           
-            if (currentUserDetails instanceof UserDetailsImpl) {
-                userToReserveFor = ((UserDetailsImpl) currentUserDetails).getUserEntity();
-            } else {
-               
-                userToReserveFor = userService.findByEmail(currentUserDetails.getUsername())
-                                    .orElseThrow(() -> new RuntimeException("Usuario autenticado no encontrado con email: " + currentUserDetails.getUsername()));
-            }
+            userToReserveFor = userDetailsImpl.getUserEntity();
         }
 
         Reservation newReservation = Reservation.builder()
@@ -88,7 +79,6 @@ public class ReservationController {
                 .startTime(reservationRequestDTO.getStartTime())
                 .endTime(reservationRequestDTO.getEndTime())
                 .purpose(reservationRequestDTO.getPurpose())
-
                 .build();
 
         Reservation createdReservation = reservationService.createReservation(newReservation, currentUserDetails);
@@ -100,6 +90,7 @@ public class ReservationController {
         return ResponseEntity.created(location).body(createdReservation);
     }
 
+
     @PutMapping("/{id}/status")
     public ResponseEntity<Reservation> updateReservationStatus(
             @PathVariable String id,
@@ -108,6 +99,33 @@ public class ReservationController {
     ) {
         return ResponseEntity.ok(reservationService.updateReservationStatus(id, status, adminUserDetails));
     }
+    
+    @PutMapping("/{id}")
+    public ResponseEntity<Reservation> updateReservationDetails(
+            @PathVariable String id,
+            @Valid @RequestBody ReservationRequestDTO reservationRequestDTO, 
+            @AuthenticationPrincipal UserDetails currentUserDetails
+    ) {
+
+        Classroom classroom = classroomService.getClassroomById(reservationRequestDTO.getClassroomId());
+        User userForReservation = null;
+        if (reservationRequestDTO.getUserId() != null) {
+             userForReservation = userService.getUserById(reservationRequestDTO.getUserId());
+        }
+
+        Reservation updatedReservationData = Reservation.builder()
+            .classroom(classroom)
+            .user(userForReservation) 
+            .startTime(reservationRequestDTO.getStartTime())
+            .endTime(reservationRequestDTO.getEndTime())
+            .purpose(reservationRequestDTO.getPurpose())
+            .build();
+
+
+        Reservation updatedReservation = reservationService.updateReservation(id, updatedReservationData, currentUserDetails);
+        return ResponseEntity.ok(updatedReservation);
+    }
+
 
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<Reservation> cancelMyReservation(

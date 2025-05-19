@@ -1,25 +1,24 @@
-
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { IonicModule, LoadingController, ToastController, NavController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
-import { ClassroomService } from '../../../services/classroom.service';
-import { Classroom } from '../../../models/classroom.model';
-import { ClassroomType } from '../../../models/classroom-type.enum'; 
+import { ClassroomService, ClassroomRequestData } from '../../../services/classroom.service';
 import { BuildingService } from '../../../services/building.service';
+import { Classroom } from '../../../models/classroom.model';
+import { ClassroomType } from '../../../models/classroom-type.enum';
 import { Building } from '../../../models/building.model';
 import { AuthService } from '../../../services/auth.service';
 import { Rol } from '../../../models/rol.model';
 import { Observable, Subject, forkJoin, of } from 'rxjs';
-import { takeUntil, catchError } from 'rxjs/operators';
+import { takeUntil, finalize, catchError, tap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-classroom-form',
   templateUrl: './classroom-form.page.html',
   styleUrls: ['./classroom-form.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, ReactiveFormsModule],
+  imports: [IonicModule, CommonModule, ReactiveFormsModule]
 })
 export class ClassroomFormPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -28,12 +27,12 @@ export class ClassroomFormPage implements OnInit, OnDestroy {
   classroomId: string | null = null;
   pageTitle = 'Nueva Aula';
   isLoading = false;
-  userRole: Rol | null = null;
+  isLoadingInitialData = true;
   buildings: Building[] = [];
-  
+  userRole: Rol | null = null;
 
-  classroomTypes = Object.keys(ClassroomType).filter(key => isNaN(Number(key)));
- 
+  public RolEnum = Rol;
+  public ClassroomTypeEnum = ClassroomType;
 
   constructor(
     private fb: FormBuilder,
@@ -41,7 +40,6 @@ export class ClassroomFormPage implements OnInit, OnDestroy {
     private buildingService: BuildingService,
     private authService: AuthService,
     private route: ActivatedRoute,
-    private router: Router,
     private loadingCtrl: LoadingController,
     private toastCtrl: ToastController,
     private navCtrl: NavController,
@@ -49,98 +47,91 @@ export class ClassroomFormPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    this.isLoadingInitialData = true;
+    this.cdr.detectChanges();
+
     this.classroomForm = this.fb.group({
-      name: ['', [Validators.required, Validators.minLength(2)]],
-      capacity: [null, [Validators.required, Validators.min(1), Validators.pattern('^[0-9]+$')]],
-      type: [null, [Validators.required]], 
+      name: ['', [Validators.required, Validators.minLength(3)]],
+      capacity: [null, [Validators.required, Validators.min(1)]],
+      type: [ClassroomType.AULA, Validators.required],
       resources: [''],
-      buildingId: [null, [Validators.required]],
+      buildingId: [null, Validators.required]
     });
 
-    this.authService.getCurrentUserRole()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((role: Rol | null) => {
-        this.userRole = role;
-       
-        this.checkPermissionsAndLoadData();
+    forkJoin({
+      role: this.authService.getCurrentUserRole().pipe(takeUntil(this.destroy$)),
+      buildingsData: this.buildingService.getAllBuildings().pipe(
+        tap(bldgs => console.log("Edificios recibidos:", bldgs)),
+        catchError(err => {
+          this.presentToast('Error crítico: No se pudieron cargar los edificios.', 'danger');
+          return of([] as Building[]);
+        })
+      )
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: results => {
+        this.userRole = results.role;
+        this.buildings = results.buildingsData || [];
+
+        if (this.userRole !== Rol.ADMIN) {
+          this.presentToast('Acceso denegado. Solo los administradores pueden gestionar aulas.', 'danger');
+          this.navCtrl.navigateBack('/app/dashboard');
+          this.isLoadingInitialData = false;
+          this.cdr.detectChanges();
+          return;
+        }
+
+        this.classroomId = this.route.snapshot.paramMap.get('id');
+        if (this.classroomId) {
+          this.isEditMode = true;
+          this.pageTitle = 'Editar Aula';
+          this.loadClassroomData(this.classroomId);
+        } else {
+          this.pageTitle = 'Nueva Aula';
+          this.isLoadingInitialData = false;
+        }
         this.cdr.detectChanges();
-      });
-
-    this.loadBuildingsForSelect();
-  }
-
-  checkPermissionsAndLoadData() {
-    if (!this.canManage()) {
-       
-        if (!this.isEditMode && this.router.url.includes('/new')) {
-            this.presentToast('Acceso denegado. No tienes permiso para crear aulas.', 'danger', 'lock-closed-outline');
-            this.navCtrl.navigateBack('/app/classrooms');
-            return;
-        }
-       
-        if (this.isEditMode) {
-             this.presentToast('Acceso denegado. No tienes permiso para editar esta aula.', 'danger', 'lock-closed-outline');
-             this.navCtrl.navigateBack('/app/classrooms');
-             return;
-        }
-    }
-
-    this.classroomId = this.route.snapshot.paramMap.get('id');
-    if (this.classroomId) {
-      this.isEditMode = true;
-      this.pageTitle = 'Editar Aula';
-      if (this.canManage()) { 
-        this.loadClassroomData(this.classroomId);
+      },
+      error: err => {
+        this.isLoadingInitialData = false;
+        this.presentToast('Error cargando datos iniciales del formulario.', 'danger');
+        this.cdr.detectChanges();
       }
-    } else {
-      this.pageTitle = 'Nueva Aula';
-     
-    }
+    });
   }
-
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
   }
 
-  canManage(): boolean {
-    if (this.userRole === null) return false;
-    return this.userRole === Rol.ADMIN || this.userRole === Rol.PROFESOR;
-  }
-
-  loadBuildingsForSelect() {
-    this.buildingService.getAllBuildings()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data) => {
-          this.buildings = data;
-          this.cdr.detectChanges();
-        },
-        error: (err) => this.presentToast('Error cargando edificios para seleccionar.', 'danger')
-      });
-  }
-
   async loadClassroomData(id: string) {
     this.isLoading = true;
     const loading = await this.loadingCtrl.create({ message: 'Cargando datos del aula...' });
     await loading.present();
-    this.classroomService.getClassroomById(id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (classroom) => {
-          this.classroomForm.patchValue(classroom);
-          this.isLoading = false;
-          loading.dismiss();
-          this.cdr.detectChanges();
-        },
-        error: async (err) => {
-          this.isLoading = false;
-          await loading.dismiss();
-          await this.presentToast(err.message || 'Error al cargar datos del aula.', 'danger');
-          this.navCtrl.navigateBack('/app/classrooms');
-        }
-      });
+
+    this.classroomService.getClassroomById(id).pipe(
+      takeUntil(this.destroy$),
+      finalize(async () => {
+        this.isLoading = false;
+        this.isLoadingInitialData = false;
+        await loading.dismiss();
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: (classroom: Classroom) => {
+        this.classroomForm.patchValue({
+          name: classroom.name,
+          capacity: classroom.capacity,
+          type: classroom.type,
+          resources: classroom.resources,
+          buildingId: classroom.building?.id || classroom.buildingId
+        });
+      },
+      error: async (err: Error) => {
+        await this.presentToast(err.message || 'Error al cargar el aula.', 'danger');
+        this.navCtrl.navigateBack('/app/classrooms');
+      }
+    });
   }
 
   async onSubmit() {
@@ -149,55 +140,58 @@ export class ClassroomFormPage implements OnInit, OnDestroy {
       await this.presentToast('Por favor, completa todos los campos requeridos.', 'warning');
       return;
     }
-    if (!this.canManage()) {
-      await this.presentToast('Acción no permitida.', 'danger');
-      return;
-    }
 
     this.isLoading = true;
     const loading = await this.loadingCtrl.create({ message: this.isEditMode ? 'Actualizando aula...' : 'Creando aula...' });
     await loading.present();
 
-    const classroomData: Classroom = this.classroomForm.value;
-    let operation: Observable<Classroom | void>;
+    const formValue = this.classroomForm.value;
+    const classroomData: ClassroomRequestData = {
+      name: formValue.name,
+      capacity: formValue.capacity,
+      type: formValue.type,
+      resources: formValue.resources,
+      buildingId: formValue.buildingId
+    };
 
+    let operation: Observable<Classroom | void>;
     if (this.isEditMode && this.classroomId) {
       operation = this.classroomService.updateClassroom(this.classroomId, classroomData);
     } else {
       operation = this.classroomService.createClassroom(classroomData);
     }
 
-    operation.pipe(takeUntil(this.destroy$)).subscribe({
+    operation.pipe(
+      takeUntil(this.destroy$),
+      finalize(async () => {
+        this.isLoading = false;
+        await loading.dismiss();
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
       next: async () => {
-        const successMsg = `Aula ${this.isEditMode ? 'actualizada' : 'creada'} correctamente.`;
-        this.isLoading = false;
-        await loading.dismiss();
-        await this.presentToast(successMsg, 'success');
-        this.navCtrl.navigateBack('/app/classrooms', { animated: true });
+        await this.presentToast(`Aula ${this.isEditMode ? 'actualizada' : 'creada'} correctamente.`, 'success');
+        this.navCtrl.navigateBack('/app/classrooms');
       },
-      error: async (err) => {
-        this.isLoading = false;
-        await loading.dismiss();
+      error: async (err: Error) => {
         await this.presentToast(err.message || 'Error al guardar el aula.', 'danger');
-      },
-    });
-  }
-
-  private markFormGroupTouched(formGroup: FormGroup) {
-    Object.values(formGroup.controls).forEach(control => {
-      control.markAsTouched();
-      if (control instanceof FormGroup) {
-        this.markFormGroupTouched(control);
       }
     });
   }
 
-  async presentToast(message: string, color: 'success' | 'danger' | 'warning', iconName?: string) {
-    const toast = await this.toastCtrl.create({ message, duration: 3500, color, position: 'top', icon: iconName });
+  markFormGroupTouched(formGroup: FormGroup) {
+    Object.values(formGroup.controls).forEach(control => {
+      control.markAsTouched();
+      if (control instanceof FormGroup) this.markFormGroupTouched(control);
+    });
+  }
+
+  async presentToast(message: string, color: 'success' | 'danger' | 'warning') {
+    const toast = await this.toastCtrl.create({ message, duration: 3000, color, position: 'top' });
     await toast.present();
   }
 
   cancel() {
-    this.navCtrl.navigateBack('/app/classrooms', { animated: true });
+    this.navCtrl.navigateBack('/app/classrooms');
   }
 }

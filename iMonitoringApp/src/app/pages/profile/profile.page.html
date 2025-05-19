@@ -1,13 +1,71 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>profile</ion-title>
+<ion-header class="md:hidden">
+  <ion-toolbar color="primary" class="dark:bg-kwd-darker">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/app/dashboard"></ion-back-button>
+    </ion-buttons>
+    <ion-title class="dark:text-kwd-light">Mi Perfil</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">profile</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding bg-gray-100 dark:bg-kwd-dark">
+  <div class="max-w-2xl mx-auto">
+    <div *ngIf="isLoading" class="flex justify-center items-center h-64">
+      <ion-spinner name="crescent" color="primary"></ion-spinner>
+    </div>
+
+    <div *ngIf="!isLoading && currentUser" class="bg-white dark:bg-kwd-darker shadow-xl rounded-lg p-6 space-y-4">
+      <div class="flex flex-col items-center">
+        <img [src]="currentUser.avatarUrl || 'assets/icon/default-avatar.svg'" 
+             alt="Avatar de {{ currentUser.name || 'usuario' }}"
+             class="w-24 h-24 rounded-full object-cover border-4 border-kwd-blue-DEFAULT dark:border-kwd-blue-600 mb-4">
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-kwd-light">{{ currentUser.name || 'Nombre no disponible' }}</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ currentUser.email }}</p>
+        <span *ngIf="userRole" 
+              class="mt-2 px-3 py-1 text-xs font-semibold rounded-full"
+              [ngClass]="{
+                'bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100': userRole === RolEnum.ADMIN,
+                'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100': userRole === RolEnum.PROFESOR,
+                'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100': userRole === RolEnum.TUTOR,
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100': userRole === RolEnum.ESTUDIANTE
+              }">
+          {{ userRole | titlecase }}
+        </span>
+      </div>
+
+      <ion-list lines="none" class="dark:bg-kwd-darker">
+        <ion-item class="dark:bg-kwd-darker dark:text-kwd-light">
+          <ion-icon name="person-circle-outline" slot="start" color="medium" class="dark:text-gray-400"></ion-icon>
+          <ion-label>
+            <h3 class="font-medium">Nombre</h3>
+            <p>{{ currentUser.name || 'No especificado' }}</p>
+          </ion-label>
+        </ion-item>
+        <ion-item class="dark:bg-kwd-darker dark:text-kwd-light">
+          <ion-icon name="mail-outline" slot="start" color="medium" class="dark:text-gray-400"></ion-icon>
+          <ion-label>
+            <h3 class="font-medium">Correo Electrónico</h3>
+            <p>{{ currentUser.email }}</p>
+          </ion-label>
+        </ion-item>
+        <ion-item class="dark:bg-kwd-darker dark:text-kwd-light">
+          <ion-icon name="briefcase-outline" slot="start" color="medium" class="dark:text-gray-400"></ion-icon>
+          <ion-label>
+            <h3 class="font-medium">Rol</h3>
+            <p>{{ userRole | titlecase }}</p>
+          </ion-label>
+        </ion-item>
+        </ion-list>
+
+      <div class="mt-6">
+        <ion-button expand="block" (click)="editProfile()" color="secondary" class="dark:text-white">
+          <ion-icon slot="start" name="create-outline"></ion-icon>
+          Editar Perfil (No implementado)
+        </ion-button>
+      </div>
+    </div>
+
+    <div *ngIf="!isLoading && !currentUser" class="text-center text-gray-500 dark:text-gray-400 mt-8">
+      <p>No se pudo cargar la información del perfil.</p>
+    </div>
+  </div>
 </ion-content>

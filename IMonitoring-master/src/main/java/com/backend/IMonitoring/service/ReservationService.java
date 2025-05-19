@@ -4,6 +4,7 @@ import com.backend.IMonitoring.model.Reservation;
 import com.backend.IMonitoring.model.ReservationStatus;
 import com.backend.IMonitoring.model.Rol;
 import com.backend.IMonitoring.model.User;
+import com.backend.IMonitoring.model.Classroom;
 import com.backend.IMonitoring.repository.ClassroomRepository;
 import com.backend.IMonitoring.repository.ReservationRepository;
 import com.backend.IMonitoring.security.UserDetailsImpl;
@@ -19,16 +20,28 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-
 @Service
 @RequiredArgsConstructor
 public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final ClassroomRepository classroomRepository;
-    private final UserService userService; 
+    private final UserService userService;
 
     public List<Reservation> getAllReservations() {
-        return reservationRepository.findAll();
+        return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "startTime"));
+    }
+
+    public List<Reservation> getAdminFilteredReservations(String classroomId, String userId, ReservationStatus status) {
+        if (status != null) {
+            return reservationRepository.findByStatus(status);
+        }
+        if (userId != null) {
+            return reservationRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "startTime"));
+        }
+        if (classroomId != null) {
+            return reservationRepository.findByClassroomId(classroomId);
+        }
+        return getAllReservations();
     }
 
     public Reservation getReservationById(String id) {
@@ -41,7 +54,7 @@ public class ReservationService {
     }
 
     public List<Reservation> getReservationsByUser(String userId) {
-        return reservationRepository.findByUserId(userId);
+        return reservationRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "startTime"));
     }
 
     public List<Reservation> getFilteredUserReservations(
@@ -54,25 +67,37 @@ public class ReservationService {
             boolean futureOnly
     ) {
         Sort sortObj = Sort.by(sortDirection.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortField);
-        List<Reservation> userReservations = reservationRepository.findByUserId(userId, sortObj);
-
-        Stream<Reservation> stream = userReservations.stream();
+        List<Reservation> userReservations;
         if (status != null) {
-            stream = stream.filter(r -> r.getStatus() == status);
+            userReservations = reservationRepository.findByUserId(userId, sortObj);
+            Stream<Reservation> stream = userReservations.stream().filter(r -> r.getStatus() == status);
+            if (futureOnly) {
+                stream = stream.filter(r -> r.getStartTime().isAfter(LocalDateTime.now()));
+            }
+            return stream.limit(size).collect(Collectors.toList());
+        } else {
+            userReservations = reservationRepository.findByUserId(userId, sortObj);
+            Stream<Reservation> stream = userReservations.stream();
+            if (futureOnly) {
+                stream = stream.filter(r -> r.getStartTime().isAfter(LocalDateTime.now()));
+            }
+            return stream.limit(size).collect(Collectors.toList());
         }
-        if (futureOnly) {
-            stream = stream.filter(r -> r.getStartTime().isAfter(LocalDateTime.now()));
-        }
-        
-        return stream.limit(size).collect(Collectors.toList());
     }
 
     public List<Reservation> getReservationsByStatus(ReservationStatus status) {
         return reservationRepository.findByStatus(status);
     }
 
-    public List<Reservation> getUpcomingReservations() {
-        return reservationRepository.findByStartTimeAfter(LocalDateTime.now());
+     public List<Reservation> getUpcomingReservations(int limit) {
+        return reservationRepository.findByStartTimeAfter(LocalDateTime.now(), Sort.by(Sort.Direction.ASC, "startTime"))
+                                    .stream().limit(limit).collect(Collectors.toList());
+    }
+    
+    public List<Reservation> getMyUpcomingReservations(String userId, int limit) {
+        Sort sort = Sort.by(Sort.Direction.ASC, "startTime");
+        return reservationRepository.findUpcomingConfirmedByUserId(userId, LocalDateTime.now(), sort)
+                                    .stream().limit(limit).collect(Collectors.toList());
     }
 
     public List<Reservation> getCurrentReservations() {
@@ -81,10 +106,13 @@ public class ReservationService {
     }
 
     @Transactional
-    public Reservation createReservation(Reservation reservation, UserDetails currentUserDetails) {
-        if (reservation.getClassroom() == null || reservation.getClassroom().getId() == null) {
+    public Reservation createReservation(Reservation reservationInput, UserDetails currentUserDetails) {
+        if (reservationInput.getClassroom() == null || reservationInput.getClassroom().getId() == null) {
             throw new IllegalArgumentException("ID del aula es requerido para crear una reserva.");
         }
+        Classroom classroom = classroomRepository.findById(reservationInput.getClassroom().getId())
+            .orElseThrow(() -> new RuntimeException("Aula no encontrada con ID: " + reservationInput.getClassroom().getId()));
+        reservationInput.setClassroom(classroom);
 
         if (!(currentUserDetails instanceof UserDetailsImpl)) {
             throw new IllegalStateException("UserDetails no es del tipo esperado UserDetailsImpl");
@@ -96,25 +124,28 @@ public class ReservationService {
              throw new IllegalStateException("No se pudo determinar el usuario para la reserva.");
         }
         
-        if (reservation.getUser() == null || reservation.getUser().getId() == null ) {
-            reservation.setUser(userMakingReservation);
-        } else if (userMakingReservation.getRole() == Rol.ADMIN) {
+        if (userMakingReservation.getRole() == Rol.ADMIN && reservationInput.getUser() != null && reservationInput.getUser().getId() != null) {
+            User userToAssign = userService.getUserById(reservationInput.getUser().getId());
+            reservationInput.setUser(userToAssign);
         } else {
-            reservation.setUser(userMakingReservation);
+            reservationInput.setUser(userMakingReservation);
         }
 
         boolean isAvailable = classroomRepository.isAvailable(
-                reservation.getClassroom().getId(),
-                reservation.getStartTime(),
-                reservation.getEndTime()
+                reservationInput.getClassroom().getId(),
+                reservationInput.getStartTime(),
+                reservationInput.getEndTime()
         );
 
         if (!isAvailable) {
-            throw new RuntimeException("La sala no está disponible en el horario solicitado");
+            throw new RuntimeException("La sala no está disponible en el horario solicitado: " +
+                reservationInput.getClassroom().getName() + " de " +
+                reservationInput.getStartTime() + " a " + reservationInput.getEndTime());
         }
 
-        reservation.setStatus(ReservationStatus.PENDIENTE);
-        return reservationRepository.save(reservation);
+        reservationInput.setStatus(ReservationStatus.PENDIENTE);
+        System.out.println("ReservationService: Guardando reserva: " + reservationInput);
+        return reservationRepository.save(reservationInput);
     }
 
     @Transactional
@@ -129,16 +160,63 @@ public class ReservationService {
         if (reservation.getStatus() == ReservationStatus.PENDIENTE &&
             (newStatus == ReservationStatus.CONFIRMADA || newStatus == ReservationStatus.RECHAZADA)) {
             reservation.setStatus(newStatus);
-        } else if (newStatus == ReservationStatus.CANCELADA) {
+        } else if (newStatus == ReservationStatus.CANCELADA &&
+                   (reservation.getStatus() == ReservationStatus.PENDIENTE || reservation.getStatus() == ReservationStatus.CONFIRMADA)) {
              reservation.setStatus(newStatus);
         }
         else {
-            throw new IllegalStateException("Transición de estado no permitida o estado final inválido para esta acción por un Admin.");
+            throw new IllegalStateException("Transición de estado no permitida (" + reservation.getStatus() + " -> " + newStatus + ") o estado final inválido para esta acción por un Admin.");
         }
         return reservationRepository.save(reservation);
     }
 
     @Transactional
+    public Reservation updateReservation(String reservationId, Reservation updatedReservationData, UserDetails currentUserDetails) {
+        Reservation existingReservation = getReservationById(reservationId);
+        UserDetailsImpl userDetailsImpl = (UserDetailsImpl) currentUserDetails;
+        User userUpdating = userDetailsImpl.getUserEntity();
+
+        if (!userUpdating.getRole().equals(Rol.ADMIN) && !Objects.equals(existingReservation.getUser().getId(), userUpdating.getId())) {
+            throw new SecurityException("No tienes permiso para modificar esta reserva.");
+        }
+        if (!userUpdating.getRole().equals(Rol.ADMIN) && existingReservation.getStatus() != ReservationStatus.PENDIENTE) {
+            throw new IllegalStateException("Solo puedes modificar tus propias reservas si están en estado PENDIENTE.");
+        }
+
+        existingReservation.setStartTime(updatedReservationData.getStartTime());
+        existingReservation.setEndTime(updatedReservationData.getEndTime());
+        existingReservation.setPurpose(updatedReservationData.getPurpose());
+
+        if (userUpdating.getRole().equals(Rol.ADMIN)) {
+            if (updatedReservationData.getClassroom() != null && updatedReservationData.getClassroom().getId() != null &&
+                !Objects.equals(existingReservation.getClassroom().getId(), updatedReservationData.getClassroom().getId())) {
+                Classroom newClassroom = classroomRepository.findById(updatedReservationData.getClassroom().getId())
+                    .orElseThrow(() -> new RuntimeException("Aula no encontrada con ID: " + updatedReservationData.getClassroom().getId()));
+                existingReservation.setClassroom(newClassroom);
+            }
+            if (updatedReservationData.getUser() != null && updatedReservationData.getUser().getId() != null &&
+                !Objects.equals(existingReservation.getUser().getId(), updatedReservationData.getUser().getId())) {
+                User newUser = userService.getUserById(updatedReservationData.getUser().getId());
+                existingReservation.setUser(newUser);
+            }
+            if (updatedReservationData.getStatus() != null) {
+                existingReservation.setStatus(updatedReservationData.getStatus());
+            }
+        }
+
+        boolean isAvailable = classroomRepository.isAvailable(
+                existingReservation.getClassroom().getId(),
+                existingReservation.getStartTime(),
+                existingReservation.getEndTime(),
+                existingReservation.getId()
+        );
+        if (!isAvailable) {
+            throw new RuntimeException("La sala no está disponible en el nuevo horario solicitado.");
+        }
+        return reservationRepository.save(existingReservation);
+    }
+
+     @Transactional
     public Reservation cancelMyReservation(String reservationId, UserDetails currentUserDetails) {
         Reservation reservation = getReservationById(reservationId);
         if (!(currentUserDetails instanceof UserDetailsImpl)) {
@@ -152,15 +230,15 @@ public class ReservationService {
         }
 
         if (reservation.getStatus() == ReservationStatus.PENDIENTE || reservation.getStatus() == ReservationStatus.CONFIRMADA) {
-            reservation.setStatus(ReservationStatus.CANCELADA); 
+            reservation.setStatus(ReservationStatus.CANCELADA);
             return reservationRepository.save(reservation);
         } else {
-            throw new IllegalStateException("Solo se pueden cancelar reservas pendientes o confirmadas.");
+            throw new IllegalStateException("Solo se pueden cancelar reservas pendientes o confirmadas. Estado actual: " + reservation.getStatus());
         }
     }
 
     @Transactional
-    public void deleteReservation(String reservationId, UserDetails currentUserDetails) { 
+    public void deleteReservation(String reservationId, UserDetails currentUserDetails) {
         Reservation reservation = getReservationById(reservationId);
          if (!(currentUserDetails instanceof UserDetailsImpl)) {
              throw new IllegalStateException("UserDetails no es del tipo esperado UserDetailsImpl");
@@ -169,7 +247,7 @@ public class ReservationService {
         User userDeleting = userDetailsImpl.getUserEntity();
 
         if (userDeleting.getRole() == Rol.ADMIN || Objects.equals(reservation.getUser().getId(), userDeleting.getId())) {
-            reservationRepository.deleteById(reservationId); 
+            reservationRepository.deleteById(reservationId);
         } else {
             throw new SecurityException("No tienes permiso para eliminar esta reserva.");
         }
