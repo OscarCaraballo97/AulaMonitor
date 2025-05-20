@@ -1,13 +1,13 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
-import { Router, RouterModule, NavigationEnd, IsActiveMatchOptions } from '@angular/router';
-import { IonicModule, MenuController, Platform, PopoverController, NavController } from '@ionic/angular';
+import { Router, RouterModule, NavigationEnd, IsActiveMatchOptions, ActivatedRoute, Routes } from '@angular/router';
+import { IonicModule, Platform, PopoverController, NavController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { Rol } from '../models/rol.model';
 import { User } from '../models/user.model';
 import { Subject } from 'rxjs';
-import { filter, takeUntil } from 'rxjs/operators';
+import { filter, takeUntil, map, take } from 'rxjs/operators'; 
 import { SettingsPanelComponent } from '../components/settings-panel/settings-panel.component';
 import { MobileActionsPopoverComponent } from '../components/mobile-actions-popover/mobile-actions-popover.component';
 
@@ -32,19 +32,21 @@ interface NavLink {
     CommonModule,
     RouterModule,
     SettingsPanelComponent,
+    MobileActionsPopoverComponent,
   ],
 })
 export class MainLayoutPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  appName = 'IMonitoring';
+  appName = 'AulaMonitor'; 
   userRole: Rol | null = null;
   currentUser: User | null = null;
+  currentPageTitle: string = 'AulaMonitor';
 
-  isUserDropdownOpen = false;
+  isUserDropdownOpen = false; 
   isSettingsPanelOpen = false;
   isNotificationsPanelOpen = false;
   isSearchPanelOpen = false;
-  showPageLoading = false;
+  showPageLoading = false; 
 
   navLinks: NavLink[] = [
     { title: 'Dashboard', icon: 'home-outline', route: '/app/dashboard', roles: [Rol.ADMIN, Rol.PROFESOR, Rol.TUTOR, Rol.ESTUDIANTE] },
@@ -55,13 +57,15 @@ export class MainLayoutPage implements OnInit, OnDestroy {
   ];
   filteredNavLinks: NavLink[] = [];
 
+  private activeElementBeforeOverlay: HTMLElement | null = null;
+
   constructor(
     public authService: AuthService,
     public themeService: ThemeService,
-    private menuCtrl: MenuController,
     private router: Router,
+    private activatedRoute: ActivatedRoute, 
     private popoverCtrl: PopoverController,
-    private platform: Platform,
+    private platform: Platform, 
     private navCtrl: NavController,
     private cdr: ChangeDetectorRef
   ) {}
@@ -70,7 +74,6 @@ export class MainLayoutPage implements OnInit, OnDestroy {
     this.authService.getCurrentUserRole().pipe(takeUntil(this.destroy$)).subscribe((role: Rol | null) => {
       this.userRole = role;
       this.updateFilteredNavLinks();
-      this.cdr.detectChanges();
     });
 
     this.authService.getCurrentUser().pipe(
@@ -84,9 +87,78 @@ export class MainLayoutPage implements OnInit, OnDestroy {
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd),
       takeUntil(this.destroy$)
-    ).subscribe(() => {
+    ).subscribe((event: NavigationEnd) => { 
       this.updateLinkActiveStates();
+      this.updatePageTitle(event.urlAfterRedirects); 
     });
+    this.updatePageTitle(this.router.url); 
+  }
+
+  
+  private storeActiveElement() {
+    if (document.activeElement && document.activeElement !== document.body) {
+      this.activeElementBeforeOverlay = document.activeElement as HTMLElement;
+    } else {
+      this.activeElementBeforeOverlay = null;
+    }
+  }
+
+  private blurActiveElement() {
+    if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function' && document.activeElement !== document.body) {
+      (document.activeElement as HTMLElement).blur();
+    }
+  }
+
+  private restoreActiveElement() {
+    if (this.activeElementBeforeOverlay && typeof this.activeElementBeforeOverlay.focus === 'function') {
+      setTimeout(() => {
+        this.activeElementBeforeOverlay?.focus();
+        this.activeElementBeforeOverlay = null;
+      }, 150);
+    }
+  }
+
+  updatePageTitle(currentUrl: string) {
+    let route = this.activatedRoute;
+    while (route.firstChild) {
+      route = route.firstChild;
+    }
+    
+    route.data.pipe(take(1)).subscribe((data: any) => {
+      const routeConfigTitle = this.findTitleInRouteConfigForUrl(currentUrl, this.router.config.find(r => r.path === 'app')?.children || []);
+      this.currentPageTitle = routeConfigTitle || data['title'] || this.getAppNameBasedOnRoute() || 'AulaMonitor';
+      this.cdr.detectChanges();
+    });
+  }
+  
+  private findTitleInRouteConfigForUrl(url: string, routes: Routes, basePath: string = '/app'): string | undefined {
+    for (const route of routes) {
+      const routePath = route.path ? (basePath + '/' + route.path).replace('//', '/') : basePath;
+      const isActive = this.router.isActive(routePath, {paths: 'exact', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored'});
+
+      if (isActive && route.data && route.data['title']) {
+        return route.data['title'];
+      }
+      
+      if (route.children) {
+        const titleFromChild = this.findTitleInRouteConfigForUrl(url, route.children, routePath);
+        if (titleFromChild) {
+          return titleFromChild;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  getAppNameBasedOnRoute(): string {
+    const currentUrl = this.router.url.toLowerCase();
+    if (currentUrl.includes('dashboard')) return 'Dashboard';
+    if (currentUrl.includes('reservations')) return 'Mis Reservas';
+    if (currentUrl.includes('classrooms')) return 'Aulas';
+    if (currentUrl.includes('buildings')) return 'Edificios';
+    if (currentUrl.includes('users')) return 'Usuarios';
+    if (currentUrl.includes('profile')) return 'Mi Perfil';
+    return this.appName;
   }
 
   ngOnDestroy() {
@@ -102,56 +174,21 @@ export class MainLayoutPage implements OnInit, OnDestroy {
     }
     this.filteredNavLinks = this.navLinks.filter(link =>
       link.roles ? link.roles.includes(this.userRole!) : true
-    ).map(link => ({
-      ...link,
-      isActive: link.isActive || false, 
-      open: link.open || false,         
-      children: link.children?.filter(child =>
-        child.roles ? child.roles.includes(this.userRole!) : true
-      ).map(child => ({ ...child, isActive: child.isActive || false }))
-    }));
+    ).map(link => ({ ...link })); 
     this.updateLinkActiveStates();
   }
 
   updateLinkActiveStates() {
-    const currentUrl = this.router.url;
     const defaultMatchOptions: IsActiveMatchOptions = {
-        paths: 'exact', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored'
+        paths: 'exact', queryParams: 'subset', fragment: 'ignored', matrixParams: 'ignored'
     };
-    const subsetMatchOptions: IsActiveMatchOptions = {
-        paths: 'subset', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored'
-    };
-
+   
     this.filteredNavLinks = this.filteredNavLinks.map(link => {
       let localIsActive = false; 
-
       if (link.route) {
-        const isDirectlyActive = this.router.isActive(link.route, defaultMatchOptions);
-        let isSubsetActiveAsParent = false;
-        if (link.children && link.children.length > 0) {
-          isSubsetActiveAsParent = this.router.isActive(link.route, subsetMatchOptions);
-        }
-        localIsActive = isDirectlyActive || isSubsetActiveAsParent;
+        localIsActive = this.router.isActive(link.route, { ...defaultMatchOptions, paths: 'subset' });
       }
-
-      let hasActiveChild = false;
-      if (link.children && link.children.length > 0) {
-        link.children = link.children.map(child => {
-          const childIsActive = child.route ? this.router.isActive(child.route, defaultMatchOptions) : false;
-          if (childIsActive) {
-            hasActiveChild = true;
-          }
-          return { ...child, isActive: childIsActive };
-        });
-        if (hasActiveChild) {
-          localIsActive = true;
-        }
-      }
-      
-     
-      const isOpen = link.open || (localIsActive && !!link.children?.length);
-
-      return { ...link, isActive: localIsActive, open: isOpen };
+      return { ...link, isActive: localIsActive };
     });
     this.cdr.detectChanges();
   }
@@ -161,34 +198,26 @@ export class MainLayoutPage implements OnInit, OnDestroy {
     return !!link.isActive; 
   }
 
-  toggleAccordion(item: NavLink, event?: MouseEvent) {
-    event?.preventDefault();
-    item.open = !item.open;
-    this.cdr.detectChanges();
-  }
-
-  async closeMenu() {
-    if (this.platform.is('mobile') || this.platform.width() < 768) {
-      await this.menuCtrl.close('kwd-sidebar');
-    }
-  }
-
   openPanel(panelName: 'settings' | 'notifications' | 'search') {
+    this.storeActiveElement(); 
+    this.blurActiveElement();   
 
     if (panelName === 'settings') this.isSettingsPanelOpen = true;
     else if (panelName === 'notifications') this.isNotificationsPanelOpen = true;
     else if (panelName === 'search') this.isSearchPanelOpen = true;
+    this.cdr.detectChanges();
   }
 
   closePanel(panelName: 'settings' | 'notifications' | 'search') {
-
     if (panelName === 'settings') this.isSettingsPanelOpen = false;
     else if (panelName === 'notifications') this.isNotificationsPanelOpen = false;
     else if (panelName === 'search') this.isSearchPanelOpen = false;
+    this.cdr.detectChanges();
+    this.restoreActiveElement(); 
   }
 
   async openMobileSubMenu(ev: any) {
-
+    this.storeActiveElement();
     const popover = await this.popoverCtrl.create({
       component: MobileActionsPopoverComponent,
       event: ev,
@@ -196,27 +225,45 @@ export class MainLayoutPage implements OnInit, OnDestroy {
       dismissOnSelect: true,
       cssClass: 'kwd-mobile-actions-popover'
     });
-    await popover.present();
-
-    const { data } = await popover.onDidDismiss();
-    if (data && data.action) {
-      switch (data.action) {
-        case 'notifications': this.openPanel('notifications'); break;
-        case 'search': this.openPanel('search'); break;
-        case 'settings': this.openPanel('settings'); break;
-        case 'theme': this.themeService.toggleTheme(); break;
-        case 'logout':
-          this.authService.logout();
-          break;
+    
+    popover.onDidDismiss().then((detail) => { 
+      this.restoreActiveElement();
+      if (detail && detail.data && detail.data.action) {
+        this.handlePopoverAction(detail.data.action);
       }
+    });
+    await popover.present();
+  }
+
+  handlePopoverAction(action: string) {
+    console.log('MainLayoutPage - Handling popover action:', action); 
+    switch (action) {
+      case 'notifications': this.openPanel('notifications'); break;
+      case 'search': this.openPanel('search'); break;
+      case 'settings': this.openPanel('settings'); break;
+      case 'profile': this.navigateToProfile(); break; 
+      case 'logout': this.logout(); break; 
     }
   }
   
   handleAvatarError(event: Event) {
-
     const element = event.target as HTMLImageElement;
     if (element) {
       element.src = 'assets/icon/default-avatar.svg';
     }
+  }
+
+  navigateToProfile() {
+    this.navCtrl.navigateForward('/app/profile');
+  }
+
+  triggerDesktopLogout() {
+    console.log('MainLayoutPage - triggerDesktopLogout() calling authService.logout()');
+    this.authService.logout();
+  }
+
+  logout() {
+    console.log('MainLayoutPage - logout() method calling authService.logout()');
+    this.authService.logout();
   }
 }

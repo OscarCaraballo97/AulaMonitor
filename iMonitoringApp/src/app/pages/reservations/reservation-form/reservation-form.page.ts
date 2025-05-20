@@ -1,24 +1,21 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, AbstractControl, ValidatorFn } from '@angular/forms';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { 
-  IonHeader, 
-  IonToolbar, 
-  IonButtons, 
-  IonBackButton, 
-  IonTitle, 
+import {
+  IonHeader,
+  IonToolbar,
+  IonButtons,
+  IonBackButton,
+  IonTitle,
   IonContent,
   IonSpinner,
   IonItem,
   IonLabel,
-  IonSelect,
+  IonSelect, 
   IonSelectOption,
   IonInput,
-  IonDatetime,
-  IonDatetimeButton,
-  IonModal,
   IonButton,
   IonTextarea,
   LoadingController,
@@ -31,7 +28,7 @@ import { Reservation, ReservationStatus } from '../../../models/reservation.mode
 import { ClassroomService } from '../../../services/classroom.service';
 import { Classroom } from '../../../models/classroom.model';
 import { AuthService } from '../../../services/auth.service';
-import { User,} from '../../../models/user.model';
+import { User } from '../../../models/user.model';
 import { Observable, Subject, forkJoin, of, combineLatest } from 'rxjs';
 import { takeUntil, catchError, tap, finalize, take, switchMap, map, distinctUntilChanged, startWith, filter } from 'rxjs/operators';
 import { Rol } from 'src/app/models/rol.model';
@@ -65,6 +62,11 @@ export function dateTimeOrderValidator(): ValidatorFn {
   };
 }
 
+interface SelectableDate {
+  value: string; 
+  display: string; 
+}
+
 @Component({
   selector: 'app-reservation-form',
   templateUrl: './reservation-form.page.html',
@@ -85,15 +87,14 @@ export function dateTimeOrderValidator(): ValidatorFn {
     IonSelect,
     IonSelectOption,
     IonInput,
-    IonDatetime,
-    IonDatetimeButton,
-    IonModal,
     IonButton,
     IonTextarea
   ],
   providers: [DatePipe]
 })
 export class ReservationFormPage implements OnInit, OnDestroy {
+  @ViewChild('classroomSelectControl') classroomSelectControl!: IonSelect;
+
   private destroy$ = new Subject<void>();
   reservationForm!: FormGroup;
   isEditMode = false;
@@ -108,14 +109,15 @@ export class ReservationFormPage implements OnInit, OnDestroy {
   availableStatuses = Object.values(ReservationStatus);
   public RolEnum = Rol;
 
-  minDateValue: string;
-  minEndDateValue: string;
-  maxDateValue: string;
-  selectedDateForTimeSlots: string = '';
-  availableStartTimes: { value: string, display: string, disabled: boolean }[] = [];
+  selectableDates: SelectableDate[] = [];
+  selectedDateForTimeSlots: string = ''; 
+  availableStartTimes: { value: string, display: string }[] = [];
   isLoadingTimes = false;
   existingReservationsForDay: Reservation[] = [];
   reservationDurationHours = 1;
+  public reservationOwnerName: string | null = null;
+
+  private activeElementBeforeOverlay: HTMLElement | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -130,18 +132,33 @@ export class ReservationFormPage implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     public datePipe: DatePipe
   ) {
-    const now = new Date();
-    this.minDateValue = this.datePipe.transform(now, 'yyyy-MM-dd')!;
-    this.minEndDateValue = this.minDateValue;
-    const maxDate = new Date();
-    maxDate.setDate(now.getDate() + 30);
-    this.maxDateValue = this.datePipe.transform(maxDate, 'yyyy-MM-dd')!;
+    this.generateSelectableDates();
   }
 
-  isDateEnabled = (dateIsoString: string): boolean => {
-    const date = new Date(dateIsoString);
-    return date.getUTCDay() !== 0;
-  };
+  generateSelectableDates() {
+    const dates: SelectableDate[] = [];
+    const todayForIteration = new Date(); 
+
+    for (let i = 0; i < 30; i++) { 
+      const currentDateLocal = new Date(todayForIteration);
+      currentDateLocal.setDate(todayForIteration.getDate() + i);
+      currentDateLocal.setHours(0, 0, 0, 0); 
+
+      if (currentDateLocal.getDay() !== 0) { 
+        const dateValueUTCString = new Date(Date.UTC(
+            currentDateLocal.getFullYear(), 
+            currentDateLocal.getMonth(), 
+            currentDateLocal.getDate()
+        )).toISOString();
+        
+        dates.push({
+          value: dateValueUTCString, 
+          display: this.datePipe.transform(currentDateLocal, 'EEEE, d \'de\' MMMM \'de\' y', undefined, 'es-CO') || ''
+        });
+      }
+    }
+    this.selectableDates = dates;
+  }
 
   ngOnInit() {
     this.initializeForm();
@@ -149,24 +166,60 @@ export class ReservationFormPage implements OnInit, OnDestroy {
     this.setupFormListeners();
   }
 
-  initializeForm() {
-    let defaultDate = new Date();
-    if (defaultDate.getHours() >= 22 || defaultDate.getHours() < 7) {
-      if (defaultDate.getHours() >= 22) defaultDate.setDate(defaultDate.getDate() + 1);
-      defaultDate.setHours(7, 0, 0, 0);
+  ionViewDidEnter() {
+    if (!this.isLoadingInitialData && this.classroomSelectControl) {
+      console.log('ReservationFormPage: ionViewDidEnter, intentando enfocar selector de aula.');
+      setTimeout(() => { 
+        if (typeof (this.classroomSelectControl as any).setFocus === 'function') {
+            (this.classroomSelectControl as any).setFocus();
+        } else {
+            const el = (this.classroomSelectControl as any).el as HTMLElement;
+            const button = el.querySelector('button') || el; 
+             if(button instanceof HTMLElement) button.focus();
+        }
+      }, 300);
     }
-    while (defaultDate.getDay() === 0) {
-      defaultDate.setDate(defaultDate.getDate() + 1);
-      defaultDate.setHours(7, 0, 0, 0);
-    }
+  }
 
-    this.selectedDateForTimeSlots = this.datePipe.transform(defaultDate, 'yyyy-MM-dd')!;
-    const defaultDateTimeISO = defaultDate.toISOString();
+  private storeActiveElement() {
+    if (document.activeElement && document.activeElement !== document.body) {
+      this.activeElementBeforeOverlay = document.activeElement as HTMLElement;
+    } else {
+      this.activeElementBeforeOverlay = null;
+    }
+  }
+
+  private blurActiveElement() {
+    if (document.activeElement && typeof (document.activeElement as HTMLElement).blur === 'function' && document.activeElement !== document.body) {
+      (document.activeElement as HTMLElement).blur();
+    }
+  }
+
+  private restoreActiveElement() {
+    if (this.activeElementBeforeOverlay && typeof this.activeElementBeforeOverlay.focus === 'function') {
+      setTimeout(() => {
+        this.activeElementBeforeOverlay?.focus();
+        this.activeElementBeforeOverlay = null;
+      }, 150); 
+    }
+  }
+
+  initializeForm() {
+    let defaultDateISOForControl = '';
+    if (this.selectableDates.length > 0) {
+      defaultDateISOForControl = this.selectableDates[0].value;
+      this.selectedDateForTimeSlots = this.datePipe.transform(new Date(defaultDateISOForControl), 'yyyy-MM-dd', 'UTC')!;
+    } else {
+      console.warn('No hay fechas seleccionables generadas para el selector.');
+      const todayForFallback = new Date();
+      defaultDateISOForControl = new Date(Date.UTC(todayForFallback.getFullYear(), todayForFallback.getMonth(), todayForFallback.getDate())).toISOString();
+      this.selectedDateForTimeSlots = this.datePipe.transform(todayForFallback, 'yyyy-MM-dd', 'UTC')!;
+    }
 
     this.reservationForm = this.fb.group({
       classroomId: [null, Validators.required],
       userId: [{ value: null, disabled: true }],
-      reservationDateControl: [defaultDateTimeISO, Validators.required],
+      reservationDateControl: [defaultDateISOForControl, Validators.required],
       startTime: [null, Validators.required],
       endTime: [{ value: null, disabled: true }, Validators.required],
       status: [{ value: ReservationStatus.PENDIENTE, disabled: true }, Validators.required],
@@ -176,14 +229,14 @@ export class ReservationFormPage implements OnInit, OnDestroy {
 
   loadInitialData() {
     this.isLoadingInitialData = true;
-
+    this.cdr.detectChanges();
     forkJoin({
       user: this.authService.getCurrentUser().pipe(take(1)),
       role: this.authService.getCurrentUserRole().pipe(take(1)),
       classroomsData: this.classroomService.getAllClassrooms().pipe(
         catchError(err => {
           console.error("Error loading classrooms:", err);
-          this.presentToast('Error loading classrooms', 'danger');
+          this.presentToast('Error al cargar las aulas', 'danger');
           return of([] as Classroom[]);
         })
       )
@@ -194,7 +247,7 @@ export class ReservationFormPage implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       })
     ).subscribe({
-      next: (results: { user: User | null, role: Rol | null, classroomsData: Classroom[] }) => {
+      next: (results) => {
         this.currentUser = results.user;
         this.userRole = results.role;
         this.classrooms = results.classroomsData;
@@ -202,46 +255,64 @@ export class ReservationFormPage implements OnInit, OnDestroy {
         this.reservationId = this.route.snapshot.paramMap.get('id');
         this.isEditMode = !!this.reservationId;
         this.pageTitle = this.isEditMode ? 'Editar Reserva' : 'Nueva Reserva';
-
-        this.configureFormBasedOnRoleAndMode();
+        
+        this.configureFormBasedOnRoleAndMode(); 
 
         if (this.isEditMode && this.reservationId) {
           this.loadReservationData(this.reservationId);
+        } else {
+           if (this.reservationForm.get('classroomId')?.value && this.reservationForm.get('reservationDateControl')?.value) {
+             this.reservationForm.get('classroomId')?.updateValueAndValidity({ emitEvent: true });
+           }
         }
       },
       error: (err) => {
         console.error("Error loading initial data:", err);
-        this.presentToast('Error loading form data', 'danger');
+        this.presentToast('Error al cargar datos del formulario', 'danger');
       }
     });
   }
 
   setupFormListeners() {
-    combineLatest([
+     combineLatest([
       this.reservationForm.get('classroomId')!.valueChanges.pipe(
-        startWith(this.reservationForm.get('classroomId')?.value),
+        startWith(this.reservationForm.get('classroomId')?.value), 
         distinctUntilChanged()
       ),
       this.reservationForm.get('reservationDateControl')!.valueChanges.pipe(
-        startWith(this.reservationForm.get('reservationDateControl')?.value),
-        map(isoDateString => isoDateString ? this.datePipe.transform(new Date(isoDateString), 'yyyy-MM-dd', 'UTC') : null),
+        startWith(this.reservationForm.get('reservationDateControl')?.value), 
+        tap(selectedDateISO_UTC => { 
+          if (selectedDateISO_UTC) {
+            this.selectedDateForTimeSlots = this.datePipe.transform(selectedDateISO_UTC, 'yyyy-MM-dd', 'UTC')!;
+            console.log('Nueva fecha seleccionada (YYYY-MM-DD de UTC):', this.selectedDateForTimeSlots); 
+            
+            this.reservationForm.get('startTime')?.setValue(null, { emitEvent: false });
+            this.reservationForm.get('endTime')?.setValue(null, { emitEvent: false });
+            this.availableStartTimes = [];
+          }
+        }),
+        map(selectedDateISO_UTC => { 
+          if (!selectedDateISO_UTC) return null;
+          return this.datePipe.transform(selectedDateISO_UTC, 'yyyy-MM-dd', 'UTC');
+        }),
         distinctUntilChanged()
       )
     ]).pipe(
       takeUntil(this.destroy$),
-      filter(([classroomId, dateString]) => !!classroomId && !!dateString),
-      switchMap(([classroomId, dateStr]) => {
+      filter(([classroomId, dateStr_UTC]) => { 
+        return !!classroomId && !!dateStr_UTC;
+      }),
+      switchMap(([classroomId, dateStr_UTC]) => { 
         this.isLoadingTimes = true;
         this.cdr.detectChanges();
-
-        const parts = dateStr!.split('-').map(Number);
+        const parts = dateStr_UTC!.split('-').map(Number);
         const dayStartUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0)).toISOString();
         const dayEndUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999)).toISOString();
-
+        console.log(`[API Call] Fetching reservations for classroom ${classroomId} from ${dayStartUTC} to ${dayEndUTC}`);
         return this.classroomService.getClassroomReservations(classroomId, dayStartUTC, dayEndUTC).pipe(
           catchError(err => {
-            console.error("Error loading reservations:", err);
-            this.presentToast('Error loading available times', 'danger');
+            console.error("Error cargando reservaciones para el día:", err);
+            this.presentToast('Error al cargar horarios disponibles', 'danger');
             return of([] as Reservation[]);
           }),
           finalize(() => {
@@ -250,86 +321,84 @@ export class ReservationFormPage implements OnInit, OnDestroy {
           })
         );
       })
-    ).subscribe((reservations: Reservation[]) => {
-      this.existingReservationsForDay = reservations;
-      this.generateAvailableTimeSlots();
+    ).subscribe((newlyFetchedReservations: Reservation[]) => { 
+      this.existingReservationsForDay = newlyFetchedReservations;
+      this.generateAvailableTimeSlots(newlyFetchedReservations);
     });
   }
 
-  generateAvailableTimeSlots() {
+  generateAvailableTimeSlots(currentDayReservations?: Reservation[]) {
+    const reservationsToUse = currentDayReservations || this.existingReservationsForDay;
+
     if (!this.selectedDateForTimeSlots || !this.reservationForm.get('classroomId')?.value) {
       this.availableStartTimes = [];
       this.cdr.detectChanges();
       return;
     }
+    console.log(`Generando slots para fecha (interpretada como UTC): ${this.selectedDateForTimeSlots}`);
+    const slots: { value: string, display: string }[] = [];
+    const openingHour = 7; 
+    let dayClosingHour = 22; 
 
-    const slots: { value: string, display: string, disabled: boolean }[] = [];
-    const openingHour = 7;
-    let dayClosingHour = 22;
+    const dateParts = this.selectedDateForTimeSlots.split('-').map(Number);
+    const selectedDateObjectForDisplay = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+    
+    const dayOfWeek = selectedDateObjectForDisplay.getDay(); 
 
-    const parts = this.selectedDateForTimeSlots.split('-').map(Number);
-    const selectedDateObject = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-    const dayOfWeek = selectedDateObject.getUTCDay();
-
-    if (dayOfWeek === 6) {
-      dayClosingHour = 12;
-    } else if (dayOfWeek === 0) {
+    if (dayOfWeek === 6) { dayClosingHour = 12; } 
+    else if (dayOfWeek === 0) { 
       this.availableStartTimes = [];
       this.cdr.detectChanges();
       return;
     }
 
-    const today = new Date();
-    const todayDateStr = this.datePipe.transform(today, 'yyyy-MM-dd', 'UTC');
-    const isSelectedDateToday = this.selectedDateForTimeSlots === todayDateStr;
+    const now = new Date(); 
+    const todayLocalDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const isSelectedDateToday = selectedDateObjectForDisplay.getTime() === todayLocalDate.getTime();
 
     for (let hour = openingHour; hour < dayClosingHour; hour++) {
-      const slotStartTimeUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], hour, 0, 0, 0));
+      const slotStartLocal = new Date(selectedDateObjectForDisplay); 
+      slotStartLocal.setHours(hour, 0, 0, 0); 
 
-      if (isSelectedDateToday) {
-        const nowLocal = new Date();
-        const slotLocal = new Date(this.selectedDateForTimeSlots + `T${hour.toString().padStart(2, '0')}:00:00`);
-        if (slotLocal < nowLocal) {
-          continue;
-        }
+      if (isSelectedDateToday && slotStartLocal.getTime() < now.getTime()) {
+        continue;
       }
+      
+      const slotStartUTCValue = slotStartLocal.toISOString(); 
 
-      const slotEndTimeUTC = new Date(slotStartTimeUTC.getTime() + this.reservationDurationHours * 60 * 60 * 1000);
-
+      const slotEndLocal = new Date(slotStartLocal);
+      slotEndLocal.setHours(slotStartLocal.getHours() + this.reservationDurationHours, 0, 0, 0);
+      const slotEndUTCForCheck = slotEndLocal.toISOString(); 
+      
       let isDisabled = false;
-      for (const reservation of this.existingReservationsForDay) {
-        const existingStart = new Date(reservation.startTime);
-        const existingEnd = new Date(reservation.endTime);
+      for (const reservation of reservationsToUse) { 
+        const existingStartUTC = new Date(reservation.startTime);
+        const existingEndUTC = new Date(reservation.endTime);
+        if (this.isEditMode && this.reservationId === reservation.id) continue;
 
-        if (this.isEditMode && this.reservationId === reservation.id) {
-          continue;
-        }
-        if (slotStartTimeUTC < existingEnd && slotEndTimeUTC > existingStart) {
+        if (new Date(slotStartUTCValue) < existingEndUTC && new Date(slotEndUTCForCheck) > existingStartUTC) {
           isDisabled = true;
           break;
         }
       }
 
-      slots.push({
-        value: slotStartTimeUTC.toISOString(),
-        display: this.datePipe.transform(slotStartTimeUTC, 'HH:mm', 'UTC', 'es-CO') || `${hour.toString().padStart(2, '0')}:00`,
-        disabled: isDisabled
-      });
+      if (!isDisabled) {
+        slots.push({
+          value: slotStartUTCValue, 
+          display: this.datePipe.transform(slotStartLocal, 'HH:mm', undefined, 'es-CO')!,
+        });
+      }
     }
-
-    this.availableStartTimes = slots;
+    this.availableStartTimes = slots as { value: string; display: string; disabled: boolean; }[];
     this.cdr.detectChanges();
   }
 
-  onStartTimeSelected(selectedStartTimeISO: string) {
-    if (!selectedStartTimeISO || this.isLoadingTimes) return;
-
-    const startTime = new Date(selectedStartTimeISO);
-    const endTime = new Date(startTime.getTime() + this.reservationDurationHours * 60 * 60 * 1000);
-
-    this.reservationForm.get('startTime')?.setValue(startTime.toISOString());
-    this.reservationForm.get('endTime')?.setValue(endTime.toISOString());
-
+  onStartTimeSelected(selectedStartTimeISO_UTC: string) {
+    if (!selectedStartTimeISO_UTC || this.isLoadingTimes) return;
+    const startTimeUTC = new Date(selectedStartTimeISO_UTC);
+    const endTimeUTC = new Date(startTimeUTC.getTime() + this.reservationDurationHours * 60 * 60 * 1000);
+    this.reservationForm.get('startTime')?.setValue(startTimeUTC.toISOString());
+    this.reservationForm.get('endTime')?.setValue(endTimeUTC.toISOString());
     this.cdr.detectChanges();
   }
 
@@ -337,58 +406,99 @@ export class ReservationFormPage implements OnInit, OnDestroy {
     if (this.userRole === Rol.ADMIN) {
       this.reservationForm.get('userId')?.enable({ emitEvent: false });
       this.reservationForm.get('status')?.enable({ emitEvent: false });
-      if (!this.isEditMode) {
+      if (!this.isEditMode) { 
         this.reservationForm.patchValue({ status: ReservationStatus.PENDIENTE }, { emitEvent: false });
       }
-    } else {
+    } else { 
       this.reservationForm.get('userId')?.disable({ emitEvent: false });
-      this.reservationForm.get('status')?.disable({ emitEvent: false });
+      this.reservationForm.get('status')?.disable({ emitEvent: false }); 
       if (this.currentUser?.id) {
         this.reservationForm.patchValue({ userId: this.currentUser.id }, { emitEvent: false });
       }
-      this.reservationForm.patchValue({ status: ReservationStatus.PENDIENTE }, { emitEvent: false });
+       if (!this.isEditMode) {
+         this.reservationForm.patchValue({ status: ReservationStatus.PENDIENTE }, { emitEvent: false });
+       }
     }
     this.cdr.detectChanges();
   }
 
   async loadReservationData(id: string) {
     this.isLoading = true;
-    const loading = await this.loadingCtrl.create({ message: 'Loading reservation...' });
+    this.reservationOwnerName = null; 
+    this.storeActiveElement();
+    this.blurActiveElement();
+    const loading = await this.loadingCtrl.create({ message: 'Cargando reserva...' });
     await loading.present();
 
     this.reservationService.getReservationById(id).pipe(
       takeUntil(this.destroy$),
       finalize(async () => {
         this.isLoading = false;
-        await loading.dismiss();
+        try { await loading.dismiss(); } catch (e) { console.warn('Error dismissing loading', e); }
+        this.restoreActiveElement();
         this.cdr.detectChanges();
       })
     ).subscribe({
-      next: (reservation) => {
-        if (!this.canEditThisReservation(reservation.userId)) {
-          this.presentToast('Not authorized to edit this reservation', 'danger');
+      next: (reservation) => { 
+        if (!this.canEditThisReservation(reservation.status, reservation.userId)) {
+          this.presentToast('No autorizado para editar esta reserva.', 'danger');
           this.navCtrl.navigateBack('/app/reservations');
           return;
         }
+        
+        this.reservationOwnerName = reservation.user?.name ?? null;
+        
+        const startTimeUTC = new Date(reservation.startTime);
+        const reservationDateAtUTCMidnightISO = new Date(Date.UTC(startTimeUTC.getUTCFullYear(), startTimeUTC.getUTCMonth(), startTimeUTC.getUTCDate())).toISOString();
+        
+        this.reservationForm.get('reservationDateControl')?.setValue(reservationDateAtUTCMidnightISO, { emitEvent: false }); 
+        this.selectedDateForTimeSlots = this.datePipe.transform(startTimeUTC, 'yyyy-MM-dd', 'UTC')!;
 
         this.reservationForm.patchValue({
           classroomId: reservation.classroomId,
-          reservationDateControl: reservation.startTime,
-          purpose: reservation.purpose
-        });
+          purpose: reservation.purpose,
+        }, { emitEvent: false }); 
 
         if (this.userRole === Rol.ADMIN) {
           this.reservationForm.patchValue({
             userId: reservation.userId,
             status: reservation.status
-          });
+          }, { emitEvent: false });
+        } else {
+            this.reservationForm.get('status')?.setValue(reservation.status, {emitEvent: false});
         }
 
-        this.selectedDateForTimeSlots = this.datePipe.transform(new Date(reservation.startTime), 'yyyy-MM-dd', 'UTC') || '';
-        this.configureFormBasedOnRoleAndMode();
+        const classroomIdForSlots = this.reservationForm.get('classroomId')?.value;
+        if (classroomIdForSlots && this.selectedDateForTimeSlots) {
+            const parts = this.selectedDateForTimeSlots.split('-').map(Number); 
+            const dayStartUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0)).toISOString();
+            const dayEndUTC = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999)).toISOString();
+
+            this.classroomService.getClassroomReservations(classroomIdForSlots, dayStartUTC, dayEndUTC)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(reservationsForDay => {
+                this.generateAvailableTimeSlots(reservationsForDay);
+                
+                const targetStartTimeISO = reservation.startTime; 
+                const matchingSlot = this.availableStartTimes.find(slot => slot.value === targetStartTimeISO);
+
+                if(matchingSlot) { 
+                    this.reservationForm.get('startTime')?.setValue(targetStartTimeISO, { emitEvent: false }); 
+                    this.reservationForm.get('endTime')?.setValue(reservation.endTime, { emitEvent: false });  
+                } else {
+                    console.warn("El slot original de la reserva ya no está disponible o no se encontró. La hora no se preseleccionará.");
+                    this.reservationForm.get('startTime')?.setValue(null, { emitEvent: false });
+                    this.reservationForm.get('endTime')?.setValue(null, { emitEvent: false });
+                     if(this.isEditMode) { 
+                        this.presentToast('El horario original de esta reserva ya no está disponible. Por favor, selecciona uno nuevo.', 'warning', 'alert-circle-outline');
+                    }
+                }
+                this.cdr.detectChanges();
+            });
+        }
       },
       error: async (err) => {
-        await this.presentToast('Error loading reservation', 'danger');
+        await this.presentToast('Error al cargar la reserva.', 'danger');
         this.navCtrl.navigateBack('/app/reservations');
       }
     });
@@ -397,49 +507,57 @@ export class ReservationFormPage implements OnInit, OnDestroy {
   async onSubmit() {
     if (this.reservationForm.invalid) {
       this.markFormGroupTouched(this.reservationForm);
-      await this.presentToast('Please complete all required fields', 'warning');
+      await this.presentToast('Por favor, completa todos los campos requeridos.', 'warning');
       return;
     }
-
     this.isLoading = true;
-    const loading = await this.loadingCtrl.create({ 
-      message: this.isEditMode ? 'Updating reservation...' : 'Creating reservation...' 
+    this.storeActiveElement();
+    this.blurActiveElement();
+    const loading = await this.loadingCtrl.create({
+      message: this.isEditMode ? 'Actualizando reserva...' : 'Creando reserva...'
     });
     await loading.present();
 
     const formValue = this.reservationForm.getRawValue();
+    const reservationDataPayload: Partial<Reservation> = {
+      classroomId: formValue.classroomId,
+      startTime: formValue.startTime, 
+      endTime: formValue.endTime,     
+      purpose: formValue.purpose,
+    };
+
+    if (this.userRole === Rol.ADMIN) {
+      reservationDataPayload.userId = formValue.userId || this.currentUser?.id; 
+      if (this.isEditMode) {
+        reservationDataPayload.status = formValue.status;
+      } else { 
+        reservationDataPayload.status = formValue.status || ReservationStatus.PENDIENTE;
+      }
+    } else { 
+        reservationDataPayload.userId = this.currentUser?.id;
+        reservationDataPayload.status = ReservationStatus.PENDIENTE;
+    }
+
     const operation = this.isEditMode && this.reservationId
-      ? this.reservationService.updateReservation(this.reservationId, {
-          classroomId: formValue.classroomId,
-          startTime: new Date(formValue.startTime).toISOString(),
-          endTime: new Date(formValue.endTime).toISOString(),
-          purpose: formValue.purpose,
-          ...(this.userRole === Rol.ADMIN && {
-            userId: formValue.userId,
-            status: formValue.status
-          })
-        })
-      : this.reservationService.createReservation({
-          classroomId: formValue.classroomId,
-          startTime: new Date(formValue.startTime).toISOString(),
-          endTime: new Date(formValue.endTime).toISOString(),
-          purpose: formValue.purpose
-        });
+      ? this.reservationService.updateReservation(this.reservationId, reservationDataPayload)
+      : this.reservationService.createReservation(reservationDataPayload as ReservationCreationData);
 
     operation.pipe(
       takeUntil(this.destroy$),
       finalize(async () => {
         this.isLoading = false;
-        await loading.dismiss();
+        try { await loading.dismiss(); } catch (e) { console.warn('Error dismissing loading on submit', e); }
+        this.restoreActiveElement();
         this.cdr.detectChanges();
       })
     ).subscribe({
       next: async () => {
-        await this.presentToast(`Reservation ${this.isEditMode ? 'updated' : 'created'} successfully`, 'success');
-        this.navCtrl.navigateBack('/app/reservations');
+        await this.presentToast(`Reserva ${this.isEditMode ? 'actualizada' : 'creada'} correctamente.`, 'success');
+        this.navCtrl.navigateBack('/app/reservations', { animated: true });
       },
-      error: async (err) => {
-        await this.presentToast(`Error ${this.isEditMode ? 'updating' : 'creating'} reservation`, 'danger');
+      error: async (err: any) => {
+        const errorMessage = err?.error?.message || err?.error?.error || err?.message || `Error al ${this.isEditMode ? 'actualizar' : 'crear'} la reserva.`;
+        await this.presentToast(errorMessage, 'danger');
       }
     });
   }
@@ -453,23 +571,40 @@ export class ReservationFormPage implements OnInit, OnDestroy {
     });
   }
 
-  async presentToast(message: string, color: 'success' | 'danger' | 'warning') {
+  async presentToast(message: string, color: 'success' | 'danger' | 'warning', iconName?: string) {
+    this.storeActiveElement();
+    this.blurActiveElement();
     const toast = await this.toastCtrl.create({
       message,
-      duration: 3000,
+      duration: 3500,
       color,
-      position: 'top'
+      position: 'top',
+      icon: iconName,
+      buttons: [ { text: 'OK', role: 'cancel' } ]
     });
-    await toast.present();
+    toast.present();
+    toast.onDidDismiss().then(() => this.restoreActiveElement());
   }
 
   cancel() {
-    this.navCtrl.navigateBack('/app/reservations');
+    this.navCtrl.navigateBack('/app/reservations', { animated: true });
   }
 
-  canEditThisReservation(reservationOwnerId?: string): boolean {
-    if (!this.userRole || !this.currentUser) return false;
-    return this.userRole === Rol.ADMIN || this.currentUser.id === reservationOwnerId;
+  canEditThisReservation(reservationStatus?: ReservationStatus, reservationOwnerId?: string): boolean {
+    if (!this.userRole || !this.currentUser) {
+      return false;
+    }
+    if (this.userRole === Rol.ADMIN) {
+      return true;
+    }
+    const isOwnReservation = this.currentUser.id === reservationOwnerId;
+    if (!isOwnReservation) {
+      return false;
+    }
+    if (this.isEditMode) {
+        return reservationStatus === ReservationStatus.PENDIENTE;
+    }
+    return true; 
   }
 
   ngOnDestroy() {

@@ -1,71 +1,87 @@
-<ion-header class="md:hidden">
+<ion-header>
   <ion-toolbar color="primary" class="dark:bg-kwd-darker">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/app/dashboard"></ion-back-button>
     </ion-buttons>
     <ion-title class="dark:text-kwd-light">Mi Perfil</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="toggleEditMode()" *ngIf="!isEditing && currentUser">
+        <ion-icon slot="icon-only" name="create-outline" aria-label="Editar Perfil"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding bg-gray-100 dark:bg-kwd-dark">
-  <div class="max-w-2xl mx-auto">
-    <div *ngIf="isLoading" class="flex justify-center items-center h-64">
-      <ion-spinner name="crescent" color="primary"></ion-spinner>
-    </div>
+  <div *ngIf="!currentUser && !isLoading" class="text-center py-8">
+    <p class="text-gray-500 dark:text-gray-400">No se pudo cargar la información del perfil.</p>
+  </div>
+  <div *ngIf="isLoading && !currentUser" class="text-center py-8">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Cargando perfil...</p>
+  </div>
 
-    <div *ngIf="!isLoading && currentUser" class="bg-white dark:bg-kwd-darker shadow-xl rounded-lg p-6 space-y-4">
-      <div class="flex flex-col items-center">
-        <img [src]="currentUser.avatarUrl || 'assets/icon/default-avatar.svg'" 
-             alt="Avatar de {{ currentUser.name || 'usuario' }}"
-             class="w-24 h-24 rounded-full object-cover border-4 border-kwd-blue-DEFAULT dark:border-kwd-blue-600 mb-4">
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-kwd-light">{{ currentUser.name || 'Nombre no disponible' }}</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ currentUser.email }}</p>
-        <span *ngIf="userRole" 
-              class="mt-2 px-3 py-1 text-xs font-semibold rounded-full"
-              [ngClass]="{
-                'bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100': userRole === RolEnum.ADMIN,
-                'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100': userRole === RolEnum.PROFESOR,
-                'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100': userRole === RolEnum.TUTOR,
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100': userRole === RolEnum.ESTUDIANTE
-              }">
-          {{ userRole | titlecase }}
-        </span>
+  <div *ngIf="currentUser" class="max-w-lg mx-auto bg-white dark:bg-kwd-darker shadow-xl rounded-lg p-6">
+    <div class="flex flex-col items-center">
+      
+      <div *ngIf="!isEditing" class="text-center w-full mt-4"> 
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-kwd-light">{{ currentUser.name }}</h1>
+        <p class="text-md text-gray-600 dark:text-gray-400 mt-1">{{ currentUser.email }}</p>
+        <p class="text-md text-gray-500 dark:text-gray-500 mt-1 capitalize">{{ currentUser.role.toLowerCase() }}</p>
+        
+        <div class="mt-6 w-full">
+          <ion-button expand="block" (click)="toggleEditMode()" class="mb-2">
+            <ion-icon name="create-outline" slot="start"></ion-icon>
+            Editar Perfil
+          </ion-button>
+          <ion-button expand="block" fill="outline" (click)="changePassword()">
+            <ion-icon name="lock-closed-outline" slot="start"></ion-icon>
+            Cambiar Contraseña
+          </ion-button>
+        </div>
       </div>
 
-      <ion-list lines="none" class="dark:bg-kwd-darker">
-        <ion-item class="dark:bg-kwd-darker dark:text-kwd-light">
-          <ion-icon name="person-circle-outline" slot="start" color="medium" class="dark:text-gray-400"></ion-icon>
-          <ion-label>
-            <h3 class="font-medium">Nombre</h3>
-            <p>{{ currentUser.name || 'No especificado' }}</p>
-          </ion-label>
+      <form *ngIf="isEditing" [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="w-full mt-6 space-y-4">
+        <ion-item lines="inset" class="rounded-md shadow-sm bg-gray-50 dark:bg-kwd-dark-light focus-within:ring-2 focus-within:ring-inset focus-within:ring-kwd-blue-DEFAULT">
+          <ion-label position="stacked" class="text-gray-700 dark:text-gray-300">Nombre Completo <span class="text-red-500">*</span></ion-label>
+          <ion-input formControlName="name" type="text" placeholder="Tu nombre completo"
+                     class="text-gray-900 dark:text-kwd-light"
+                     [ngClass]="{'ion-invalid ion-touched': profileForm.get('name')?.invalid && profileForm.get('name')?.touched}">
+          </ion-input>
         </ion-item>
-        <ion-item class="dark:bg-kwd-darker dark:text-kwd-light">
-          <ion-icon name="mail-outline" slot="start" color="medium" class="dark:text-gray-400"></ion-icon>
-          <ion-label>
-            <h3 class="font-medium">Correo Electrónico</h3>
-            <p>{{ currentUser.email }}</p>
-          </ion-label>
-        </ion-item>
-        <ion-item class="dark:bg-kwd-darker dark:text-kwd-light">
-          <ion-icon name="briefcase-outline" slot="start" color="medium" class="dark:text-gray-400"></ion-icon>
-          <ion-label>
-            <h3 class="font-medium">Rol</h3>
-            <p>{{ userRole | titlecase }}</p>
-          </ion-label>
-        </ion-item>
-        </ion-list>
+        <div *ngIf="profileForm.get('name')?.invalid && profileForm.get('name')?.touched" class="text-xs text-red-600 dark:text-kwd-red px-1">
+          <small *ngIf="profileForm.get('name')?.errors?.['required']">El nombre es requerido.</small>
+        </div>
 
-      <div class="mt-6">
-        <ion-button expand="block" (click)="editProfile()" color="secondary" class="dark:text-white">
-          <ion-icon slot="start" name="create-outline"></ion-icon>
-          Editar Perfil (No implementado)
-        </ion-button>
-      </div>
-    </div>
+        <ion-item lines="inset" class="rounded-md shadow-sm bg-gray-50 dark:bg-kwd-dark-light focus-within:ring-2 focus-within:ring-inset focus-within:ring-kwd-blue-DEFAULT">
+          <ion-label position="stacked" class="text-gray-700 dark:text-gray-300">Correo Electrónico <span class="text-red-500">*</span></ion-label>
+          <ion-input formControlName="email" type="email" placeholder="tu@correo.com"
+                     class="text-gray-900 dark:text-kwd-light"
+                     [ngClass]="{'ion-invalid ion-touched': profileForm.get('email')?.invalid && profileForm.get('email')?.touched}">
+          </ion-input>
+        </ion-item>
+        <div *ngIf="profileForm.get('email')?.invalid && profileForm.get('email')?.touched" class="text-xs text-red-600 dark:text-kwd-red px-1">
+          <small *ngIf="profileForm.get('email')?.errors?.['required']">El correo es requerido.</small>
+          <small *ngIf="profileForm.get('email')?.errors?.['email']">Ingresa un correo válido.</small>
+        </div>
+        
+        <ion-item lines="none" class="rounded-md bg-gray-100 dark:bg-kwd-dark-light">
+          <ion-label position="stacked" class="text-gray-600 dark:text-gray-400">Rol:</ion-label>
+          <ion-input [value]="currentUser.role.toLowerCase() | titlecase" readonly class="text-gray-800 dark:text-kwd-light"></ion-input>
+        </ion-item>
 
-    <div *ngIf="!isLoading && !currentUser" class="text-center text-gray-500 dark:text-gray-400 mt-8">
-      <p>No se pudo cargar la información del perfil.</p>
+        <div class="mt-6 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
+          <ion-button type="button" fill="outline" (click)="toggleEditMode()" color="medium" class="dark:text-gray-300 dark:border-gray-600">
+            <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+            Cancelar
+          </ion-button>
+          <ion-button type="submit" [disabled]="profileForm.invalid || isLoading" color="primary" class="dark:text-white">
+            <ion-spinner *ngIf="isLoading" name="dots" class="mr-2"></ion-spinner>
+            <ion-icon name="save-outline" slot="start"></ion-icon>
+            Guardar Cambios
+          </ion-button>
+        </div>
+      </form>
     </div>
   </div>
 </ion-content>

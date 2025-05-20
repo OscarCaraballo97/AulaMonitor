@@ -76,7 +76,7 @@
       {{ filterStatus ? (filterStatus | titlecase) + 's' : 'Todas Mis Reservas' }}
     </h2>
      <h2 *ngIf="userRole === RolEnum.ADMIN" class="text-xl font-semibold text-gray-700 dark:text-kwd-light mb-3">
-      {{ filterStatus ? 'Reservas ' + (filterStatus | titlecase) + 's' : 'Todas las Reservas (Excepto Pendientes)' }}
+      {{ filterStatus ? 'Reservas ' + (filterStatus | titlecase) + 's' : 'Todas las Reservas' }}
     </h2>
 
     <div *ngIf="isLoading && reservations.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
